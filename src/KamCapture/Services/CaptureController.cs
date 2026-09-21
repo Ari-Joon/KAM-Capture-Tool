@@ -92,8 +92,8 @@ namespace KamCapture.Services
             {
                 try
                 {
-                    Directory.CreateDirectory(cfg.SaveFolder);
-                    savedPath = Path.Combine(cfg.SaveFolder, cfg.BuildFileName(".png"));
+                    var folder = cfg.EnsureSaveFolder();
+                    savedPath = Path.Combine(folder, cfg.BuildFileName(".png"));
                     EditorWindow.SaveTo(savedPath, image);
                     saved = true;
                 }

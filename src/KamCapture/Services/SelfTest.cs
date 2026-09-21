@@ -127,6 +127,37 @@ namespace KamCapture.Services
             catch (Exception ex) { return Fail(ex.ToString()); }
         }
 
+        /// <summary>Walk the exact path the Save button takes, and report where it breaks.</summary>
+        public static int SaveTest()
+        {
+            try
+            {
+                var cfg = Settings.AppSettings.Load();
+                Say("save folder : " + cfg.SaveFolder);
+                Say("template    : " + cfg.FileNameTemplate);
+                Say("export scale: " + cfg.ExportScale);
+
+                var doc = BuildSample();
+                Say("board       : " + doc.BoardSize.Width + " x " + doc.BoardSize.Height);
+
+                var flat = doc.Export(cfg.ExportScale);
+                Say("rendered    : " + flat.PixelWidth + " x " + flat.PixelHeight);
+
+                Directory.CreateDirectory(cfg.SaveFolder);
+                var name = cfg.BuildFileName(".png");
+                Say("file name   : " + name);
+
+                var path = Path.Combine(cfg.SaveFolder, name);
+                UI.EditorWindow.SaveTo(path, flat);
+
+                if (!File.Exists(path)) return Fail("SaveTo returned but no file exists at " + path);
+                Say("written     : " + path + "  (" + new FileInfo(path).Length / 1024 + " KB)");
+                Say("save-test OK");
+                return 0;
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+        }
+
         private static void Say(string message)
         {
             Console.WriteLine(message);
@@ -148,12 +179,12 @@ namespace KamCapture.Services
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
-                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x1E, 0x24, 0x31)), null, new Rect(0, 0, 520, 300));
-                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0x4A, 0x7C, 0xFF)), null,
+                dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x1E, 0x1E, 0x24)), null, new Rect(0, 0, 520, 300));
+                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0xD9, 0xA9, 0x3A)), null,
                     new Rect(60, 90, 150, 44), 6, 6);
-                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0x2A, 0x33, 0x44)), null,
+                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x31)), null,
                     new Rect(60, 160, 380, 26), 4, 4);
-                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0x2A, 0x33, 0x44)), null,
+                dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x31)), null,
                     new Rect(60, 200, 300, 26), 4, 4);
             }
             var rtb = new RenderTargetBitmap(520, 300, 96, 96, PixelFormats.Pbgra32);
@@ -233,7 +264,7 @@ namespace KamCapture.Services
                 doc.Items.Add(new SymbolItem
                 {
                     A = new Point(x, 560), B = new Point(x + 52, 612),
-                    Symbol = name, Filled = true, StrokeColor = "#4A7CFF", Thickness = 6
+                    Symbol = name, Filled = true, StrokeColor = "#D9A93A", Thickness = 6
                 });
                 x += 64;
             }

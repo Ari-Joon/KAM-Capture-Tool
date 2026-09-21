@@ -3,14 +3,14 @@
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
     <!-- KAM family palette -->
-    <Color x:Key="NavyColor">#FF0F1219</Color>
-    <Color x:Key="PanelColor">#FF161B24</Color>
-    <Color x:Key="PanelHiColor">#FF1E2531</Color>
-    <Color x:Key="EdgeColor">#FF262E3C</Color>
-    <Color x:Key="TextColor">#FFE6EAF2</Color>
-    <Color x:Key="TextDimColor">#FF98A4BA</Color>
-    <Color x:Key="AccentColor">#FF4A7CFF</Color>
-    <Color x:Key="AccentDeepColor">#FF3A63D8</Color>
+    <Color x:Key="NavyColor">#FF0C0C0E</Color>
+    <Color x:Key="PanelColor">#FF15151A</Color>
+    <Color x:Key="PanelHiColor">#FF1E1E24</Color>
+    <Color x:Key="EdgeColor">#FF2C2C33</Color>
+    <Color x:Key="TextColor">#FFF7F7F5</Color>
+    <Color x:Key="TextDimColor">#FF9A9A94</Color>
+    <Color x:Key="AccentColor">#FFD9A93A</Color>
+    <Color x:Key="AccentDeepColor">#FFA9781F</Color>
     <Color x:Key="DangerColor">#FFE5342A</Color>
 
     <SolidColorBrush x:Key="Navy" Color="{StaticResource NavyColor}"/>
@@ -47,11 +47,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="#FF283245"/>
-                            <Setter TargetName="b" Property="BorderBrush" Value="#FF3C495F"/>
+                            <Setter TargetName="b" Property="Background" Value="#FF26262C"/>
+                            <Setter TargetName="b" Property="BorderBrush" Value="#FF3A3A42"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="#FF1B2230"/>
+                            <Setter TargetName="b" Property="Background" Value="#FF17171C"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="b" Property="Opacity" Value="0.45"/>
@@ -82,7 +82,7 @@
                             <Setter TargetName="b" Property="Background" Value="{StaticResource Accent}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="#FF2F55C4"/>
+                            <Setter TargetName="b" Property="Background" Value="#FF8A6118"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="b" Property="Opacity" Value="0.45"/>
@@ -114,7 +114,7 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="#FF232B3A"/>
+                            <Setter TargetName="b" Property="Background" Value="#FF222228"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="b" Property="Background" Value="{StaticResource AccentDeep}"/>
@@ -132,7 +132,7 @@
 
     <!-- ===================== TextBox ===================== -->
     <Style TargetType="TextBox">
-        <Setter Property="Background" Value="#FF10151E"/>
+        <Setter Property="Background" Value="#FF121216"/>
         <Setter Property="Foreground" Value="{StaticResource Fg}"/>
         <Setter Property="BorderBrush" Value="{StaticResource Edge}"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -167,7 +167,7 @@
                 <ControlTemplate TargetType="CheckBox">
                     <StackPanel Orientation="Horizontal" Background="Transparent">
                         <Border x:Name="box" Width="17" Height="17" CornerRadius="4"
-                                Background="#FF10151E" BorderBrush="{StaticResource Edge}"
+                                Background="#FF121216" BorderBrush="{StaticResource Edge}"
                                 BorderThickness="1" VerticalAlignment="Center">
                             <Path x:Name="tick" Data="M 2,6 L 6,10 L 13,2" Stroke="White"
                                   StrokeThickness="2" Visibility="Collapsed"
@@ -198,7 +198,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Slider">
                     <Grid VerticalAlignment="Center">
-                        <Border Height="4" CornerRadius="2" Background="#FF222A38" VerticalAlignment="Center"/>
+                        <Border Height="4" CornerRadius="2" Background="#FF24242A" VerticalAlignment="Center"/>
                         <Track x:Name="PART_Track">
                             <Track.DecreaseRepeatButton>
                                 <RepeatButton Command="Slider.DecreaseLarge" Opacity="0" Focusable="False"/>
@@ -245,7 +245,7 @@
     </Style>
 
     <Style TargetType="ComboBox">
-        <Setter Property="Background" Value="#FF10151E"/>
+        <Setter Property="Background" Value="#FF121216"/>
         <Setter Property="Foreground" Value="{StaticResource Fg}"/>
         <Setter Property="BorderBrush" Value="{StaticResource Edge}"/>
         <Setter Property="FontFamily" Value="Segoe UI"/>

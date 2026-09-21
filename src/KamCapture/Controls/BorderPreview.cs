@@ -42,7 +42,7 @@ namespace KamCapture.Controls
             card.Freeze();
             dc.DrawRoundedRectangle(card, null, new Rect(w * 0.10, h * 0.20, w * 0.52, h * 0.60), 5, 5);
 
-            var bar = new SolidColorBrush(Color.FromRgb(0x4A, 0x7C, 0xFF));
+            var bar = new SolidColorBrush(Color.FromRgb(0xD9, 0xA9, 0x3A));
             bar.Freeze();
             dc.DrawRoundedRectangle(bar, null, new Rect(w * 0.14, h * 0.30, w * 0.26, h * 0.09), 3, 3);
 
@@ -128,7 +128,7 @@ namespace KamCapture.Controls
                     11, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip);
 
                 var box = new Rect(sel.Left, Math.Max(2, sel.Top - ft.Height - 8), ft.Width + 12, ft.Height + 6);
-                var bg = new SolidColorBrush(Color.FromArgb(225, 15, 18, 25));
+                var bg = new SolidColorBrush(Color.FromArgb(225, 12, 12, 14));
                 bg.Freeze();
                 var edge = new Pen(new SolidColorBrush(accent), 1);
                 edge.Brush.Freeze();

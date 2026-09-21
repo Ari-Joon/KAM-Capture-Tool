@@ -178,8 +178,13 @@ namespace KamCapture.Recording
             Target = target;
             _ffmpeg = ffmpegPath;
 
-            Directory.CreateDirectory(cfg.RecordFolder);
-            OutputPath = Path.Combine(cfg.RecordFolder, cfg.BuildFileName(".mp4"));
+            var folder = Services.OutputFolder.Resolve(cfg.RecordFolder, Services.OutputFolder.RecordingsLeaf);
+            if (!string.Equals(folder, cfg.RecordFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                cfg.RecordFolder = folder;
+                cfg.Save();
+            }
+            OutputPath = Path.Combine(folder, cfg.BuildFileName(".mp4"));
         }
 
         private static int Even(int v) => v % 2 == 0 ? v : v - 1;

@@ -7,7 +7,7 @@
         SizeToContent="WidthAndHeight" WindowStartupLocation="Manual"
         UseLayoutRounding="True">
 
-    <Border Background="#F20F1219" BorderBrush="{StaticResource Edge}" BorderThickness="1"
+    <Border Background="#F20C0C0E" BorderBrush="{StaticResource Edge}" BorderThickness="1"
             CornerRadius="10" Padding="10,7" MouseLeftButtonDown="OnDragBar">
         <Border.Effect>
             <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.55" Color="Black"/>
@@ -60,7 +60,7 @@
                     Margin="6,0,0,0" VerticalAlignment="Center"
                     ValueChanged="OnMicGain" ToolTip="Microphone level"/>
 
-            <Border Background="#FF10151E" CornerRadius="3" Width="6" Height="26" Margin="8,0,0,0"
+            <Border Background="#FF121216" CornerRadius="3" Width="6" Height="26" Margin="8,0,0,0"
                     VerticalAlignment="Center">
                 <Border x:Name="Meter" Background="#FF2BB673" CornerRadius="3" Height="0"
                         VerticalAlignment="Bottom"/>

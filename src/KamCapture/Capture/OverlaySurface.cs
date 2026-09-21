@@ -425,7 +425,7 @@ namespace KamCapture.Capture
             if (x + w > _mon.X + _mon.Width) x = _mon.X + _mon.Width - w;
             if (x < _mon.X) x = _mon.X;
 
-            var bg = new SolidColorBrush(Color.FromArgb(225, 15, 18, 25));
+            var bg = new SolidColorBrush(Color.FromArgb(225, 12, 12, 14));
             bg.Freeze();
             var edge = new Pen(new SolidColorBrush(ColorUtil.Parse(_s.Cfg.BorderColor)), 1 * U);
             edge.Brush.Freeze();
@@ -459,7 +459,7 @@ namespace KamCapture.Capture
                 : "Drag to select     Ctrl+A whole screen  ·  W window  ·  M magnifier  ·  Esc cancel";
 
             var title = Text($"KAM Capture — {mode}", 15 * U, Brushes.White, true);
-            var body = Text(text, 12.5 * U, new SolidColorBrush(Color.FromRgb(0x9A, 0xA6, 0xBC)), false);
+            var body = Text(text, 12.5 * U, new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x94)), false);
 
             double padX = 18 * U, padY = 13 * U, gap = 5 * U;
             double w = Math.Max(title.Width, body.Width) + padX * 2;
@@ -467,7 +467,7 @@ namespace KamCapture.Capture
             double x = _mon.X + (_mon.Width - w) / 2;
             double y = _mon.Y + _mon.Height * 0.08;
 
-            var bg = new SolidColorBrush(Color.FromArgb(232, 15, 18, 25));
+            var bg = new SolidColorBrush(Color.FromArgb(232, 12, 12, 14));
             bg.Freeze();
             var edge = new Pen(new SolidColorBrush(ColorUtil.Parse(_s.Cfg.BorderColor)), 1 * U);
             edge.Brush.Freeze();
@@ -521,7 +521,7 @@ namespace KamCapture.Capture
 
             var label = Text($"{(int)_s.Cursor.X}, {(int)_s.Cursor.Y}", 11 * U, Brushes.White, true);
             var lb = new Rect(ox, oy + size + 4 * U, Math.Max(label.Width + 10 * U, size), label.Height + 6 * U);
-            var bg = new SolidColorBrush(Color.FromArgb(225, 15, 18, 25));
+            var bg = new SolidColorBrush(Color.FromArgb(225, 12, 12, 14));
             bg.Freeze();
             dc.DrawRoundedRectangle(bg, null, lb, 4 * U, 4 * U);
             dc.DrawText(label, new Point(lb.X + 5 * U, lb.Y + 3 * U));
@@ -566,7 +566,7 @@ namespace KamCapture.Capture
             // Exactly one monitor draws the bar: the one holding its centre.
             if (!_mon.Contains((int)(bx + total / 2), (int)(by + h / 2))) return;
 
-            var bg = new SolidColorBrush(Color.FromArgb(242, 15, 18, 25));
+            var bg = new SolidColorBrush(Color.FromArgb(242, 12, 12, 14));
             bg.Freeze();
             var edge = new Pen(new SolidColorBrush(Color.FromArgb(255, 38, 46, 60)), 1 * U);
             edge.Brush.Freeze();
@@ -583,7 +583,7 @@ namespace KamCapture.Capture
                 bool danger = items[i].Action == CaptureAction.Cancel;
                 if (primary)
                 {
-                    var b = new SolidColorBrush(ColorUtil.Parse("#3A63D8"));
+                    var b = new SolidColorBrush(ColorUtil.Parse("#A9781F"));
                     b.Freeze();
                     dc.DrawRoundedRectangle(b, null, r, 5 * U, 5 * U);
                 }

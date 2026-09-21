@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using KamCapture.Editor;
@@ -24,13 +25,13 @@ namespace KamCapture.Services
                 Directory.CreateDirectory(outputDir);
                 var cfg = AppSettings.Load();
 
-                Shoot(new MainWindow(cfg), 726, 560, Path.Combine(outputDir, "home.png"));
-                Shoot(new SettingsWindow(cfg), 720, 760, Path.Combine(outputDir, "settings.png"));
+                Shoot(new MainWindow(cfg), 568, 364, Path.Combine(outputDir, "home.png"));
+                Shoot(new SettingsWindow(cfg), 660, 700, Path.Combine(outputDir, "settings.png"));
                 Shoot(new RecorderSetupWindow(cfg), 620, 580, Path.Combine(outputDir, "record-setup.png"));
 
                 var editor = new EditorWindow(SelfTest.SampleCapture(), cfg);
                 editor.PrepareForDocShot();
-                Shoot(editor, 1280, 820, Path.Combine(outputDir, "annotator.png"));
+                Shoot(editor, 1220, 820, Path.Combine(outputDir, "annotator.png"));
 
                 Console.WriteLine("doc shots written to " + outputDir);
                 return 0;
@@ -50,17 +51,23 @@ namespace KamCapture.Services
             if (window.Content is not FrameworkElement root)
                 throw new InvalidOperationException("window has no content: " + window.GetType().Name);
 
+            // Arranging the root directly would swallow its margin, because a
+            // margin is applied by the parent. Re-host it in a border of the
+            // window's own size so the shot matches what the window shows.
+            window.Content = null;
+            var host = new Border { Child = root, Background = window.Background ?? Brushes.Black };
+
             var size = new Size(width, height);
-            root.Measure(size);
-            root.Arrange(new Rect(size));
-            root.UpdateLayout();
+            host.Measure(size);
+            host.Arrange(new Rect(size));
+            host.UpdateLayout();
 
-            // Arrange twice: the first pass settles sizes that later passes read.
-            root.Measure(size);
-            root.Arrange(new Rect(size));
-            root.UpdateLayout();
+            // A second pass: the first settles sizes that later passes read.
+            host.Measure(size);
+            host.Arrange(new Rect(size));
+            host.UpdateLayout();
 
-            var brush = new VisualBrush(root)
+            var brush = new VisualBrush(host)
             {
                 Stretch = Stretch.None,
                 AlignmentX = AlignmentX.Left,
@@ -72,7 +79,6 @@ namespace KamCapture.Services
             using (var dc = dv.RenderOpen())
             {
                 dc.PushTransform(new ScaleTransform(scale, scale));
-                dc.DrawRectangle(window.Background ?? Brushes.Black, null, new Rect(size));
                 dc.DrawRectangle(brush, null, new Rect(size));
                 dc.Pop();
             }

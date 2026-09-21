@@ -64,11 +64,6 @@ namespace KamCapture.UI
                 if (o is Item it && Equals(it.Value, _cfg.DelaySeconds)) { CmbDelay.SelectedItem = o; break; }
             if (CmbDelay.SelectedItem == null) CmbDelay.SelectedIndex = 0;
 
-            ChkClipboard.IsChecked = _cfg.CopyToClipboardOnCapture;
-            ChkEditor.IsChecked = _cfg.OpenEditorAfterCapture;
-            ChkAutoSave.IsChecked = _cfg.AutoSave;
-            ChkCursor.IsChecked = _cfg.IncludeCursor;
-
             var mons = Screens.All();
             var (_, _, vw, vh) = Screens.VirtualBounds();
 
@@ -87,8 +82,9 @@ namespace KamCapture.UI
 
         private void UpdateHotkeyHint()
         {
+            // One hint, not three: the full list is in Settings.
             LblHotkeys.Text = _cfg.HotkeysEnabled
-                ? $"{_cfg.HotkeyRegion}  region     {_cfg.HotkeyWindow}  window     {_cfg.HotkeyRecord}  record"
+                ? _cfg.HotkeyRegion + " anywhere in Windows"
                 : "Global shortcuts are off";
         }
 
@@ -136,15 +132,6 @@ namespace KamCapture.UI
             }
         }
 
-        private void OnOptionChanged(object sender, RoutedEventArgs e)
-        {
-            if (!_ready) return;
-            _cfg.CopyToClipboardOnCapture = ChkClipboard.IsChecked == true;
-            _cfg.OpenEditorAfterCapture = ChkEditor.IsChecked == true;
-            _cfg.AutoSave = ChkAutoSave.IsChecked == true;
-            _cfg.IncludeCursor = ChkCursor.IsChecked == true;
-            _cfg.Save();
-        }
 
         private async void OnCapture(object sender, RoutedEventArgs e)
         {
@@ -175,8 +162,8 @@ namespace KamCapture.UI
         {
             try
             {
-                Directory.CreateDirectory(_cfg.SaveFolder);
-                Process.Start(new ProcessStartInfo(_cfg.SaveFolder) { UseShellExecute = true });
+                var folder = _cfg.EnsureSaveFolder();
+                Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
             }
             catch (Exception ex) { Say("Could not open the folder: " + ex.Message); }
         }

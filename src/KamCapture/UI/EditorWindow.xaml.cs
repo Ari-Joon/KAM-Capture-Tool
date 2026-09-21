@@ -20,7 +20,6 @@ namespace KamCapture.UI
         private readonly BoardSurface _surface;
         private readonly AppSettings _cfg;
         private ColorButton _inkColor = null!;
-        private ColorButton _textBgColor = null!;
         private ColorButton _fillColor = null!;
         private SymbolPaletteButton _symbolPalette = null!;
         private bool _ready;
@@ -139,17 +138,6 @@ namespace KamCapture.UI
             };
             HostInkColor.Content = _inkColor;
 
-            _textBgColor = new ColorButton { Color = ColorUtil.Parse(_surface.Options.TextBackgroundColor) };
-            _textBgColor.ColorChanged += c =>
-            {
-                _surface.Options.TextBackgroundColor = ColorUtil.ToHex(c);
-                _surface.ApplyToSelection(i =>
-                {
-                    if (i is TextItem t && t.BackgroundColor != null) t.BackgroundColor = ColorUtil.ToHex(c);
-                });
-            };
-            HostTextBgColor.Content = _textBgColor;
-
             _fillColor = new ColorButton { Color = ColorUtil.Parse(_surface.Options.ShapeFillColor), ShowAlpha = true };
             _fillColor.ColorChanged += c =>
             {
@@ -211,23 +199,6 @@ namespace KamCapture.UI
             CmbExportScale.DisplayMemberPath = "Label";
             CmbExportScale.SelectedIndex = Math.Max(0, Math.Min(3, _cfg.ExportScale - 1));
 
-            CmbSandbox.ItemsSource = new[]
-            {
-                new ComboItem("Tight", 40.0),
-                new ComboItem("Comfortable", 260.0),
-                new ComboItem("Wide", 520.0),
-                new ComboItem("Extra wide", 900.0),
-            };
-            CmbSandbox.DisplayMemberPath = "Label";
-            CmbSandbox.SelectedIndex = _cfg.BoardMargin switch
-            {
-                <= 120 => 0,
-                <= 380 => 1,
-                <= 700 => 2,
-                _ => 3
-            };
-
-            ChkArrowEnd.IsChecked = true;
             ChkTextBg.IsChecked = _surface.Options.TextBackground;
             SldThickness.Value = _surface.Options.Thickness;
             SldFont.Value = _surface.Options.FontSize;
@@ -262,11 +233,11 @@ namespace KamCapture.UI
 
             var tool = _surface.Tool;
 
+            Show(GrpColour, tool is not (EditTool.Select or EditTool.Pan or EditTool.Crop));
             Show(GrpThickness, tool is EditTool.Pencil or EditTool.Highlighter or EditTool.Line
                 or EditTool.Arrow or EditTool.Rectangle or EditTool.Ellipse or EditTool.Symbol);
             Show(GrpFont, tool is EditTool.Text or EditTool.Step);
             Show(GrpShape, tool is EditTool.Rectangle or EditTool.Ellipse);
-            Show(GrpArrow, tool is EditTool.Line or EditTool.Arrow);
             Show(GrpStep, tool is EditTool.Step);
             Show(GrpSymbol, tool is EditTool.Symbol);
             Show(GrpRedact, tool is EditTool.Redact);
@@ -288,9 +259,6 @@ namespace KamCapture.UI
             BtnRedo.IsEnabled = _surface.Undo.CanRedo;
             BtnGroup.IsEnabled = _surface.CanGroup;
             BtnUngroup.IsEnabled = _surface.CanUngroup;
-            BtnDelete.IsEnabled = _surface.Selection.Count > 0;
-            BtnFront.IsEnabled = _surface.Selection.Count > 0;
-            BtnBack.IsEnabled = _surface.Selection.Count > 0;
 
             LblZoom.Text = $"{_surface.Zoom * 100:0}%";
 
@@ -401,19 +369,6 @@ namespace KamCapture.UI
             });
         }
 
-        private void OnArrowChanged(object sender, RoutedEventArgs e)
-        {
-            _surface.Options.ArrowStart = ChkArrowStart.IsChecked == true;
-            _surface.Options.ArrowEnd = ChkArrowEnd.IsChecked == true;
-            _surface.ApplyToSelection(i =>
-            {
-                if (i is LineItem l)
-                {
-                    l.ArrowStart = _surface.Options.ArrowStart;
-                    l.ArrowEnd = _surface.Options.ArrowEnd;
-                }
-            });
-        }
 
         private void OnStepStyleChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -435,17 +390,6 @@ namespace KamCapture.UI
             _surface.ApplyToSelection(i => { if (i is RedactItem r) r.BlockSize = _surface.Options.RedactBlock; });
         }
 
-        private void OnSandboxChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (!_ready || CmbSandbox.SelectedItem is not ComboItem { Value: double margin }) return;
-            _surface.Undo.Push();
-            _surface.Doc.SetMargin(margin);
-            _surface.Doc.ClampImage();
-            _surface.ZoomToFit();
-            _cfg.BoardMargin = margin;
-            _cfg.Save();
-            UpdateChrome();
-        }
 
         private void OnExportScaleChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -461,6 +405,8 @@ namespace KamCapture.UI
         private void OnGroup(object sender, RoutedEventArgs e) => _surface.GroupSelection();
         private void OnUngroup(object sender, RoutedEventArgs e) => _surface.UngroupSelection();
         private void OnDelete(object sender, RoutedEventArgs e) => _surface.DeleteSelection();
+        private void OnDuplicate(object sender, RoutedEventArgs e) => _surface.DuplicateSelection();
+        private void OnSelectAll(object sender, RoutedEventArgs e) => _surface.SelectAll();
 
         private void OnBringFront(object sender, RoutedEventArgs e)
         {
@@ -532,8 +478,8 @@ namespace KamCapture.UI
             _surface.CommitTextEdit();
             try
             {
-                Directory.CreateDirectory(_cfg.SaveFolder);
-                var path = Path.Combine(_cfg.SaveFolder, _cfg.BuildFileName(".png"));
+                var folder = _cfg.EnsureSaveFolder();
+                var path = Path.Combine(folder, _cfg.BuildFileName(".png"));
                 SaveTo(path, Flatten());
                 _lastSavedPath = path;
                 Flash("Saved to " + path);
@@ -552,7 +498,7 @@ namespace KamCapture.UI
             {
                 Filter = "PNG image (*.png)|*.png|JPEG image (*.jpg)|*.jpg|Bitmap (*.bmp)|*.bmp",
                 FileName = _cfg.BuildFileName(".png"),
-                InitialDirectory = Directory.Exists(_cfg.SaveFolder) ? _cfg.SaveFolder : null,
+                InitialDirectory = _cfg.EnsureSaveFolder(),
                 Title = "Save capture"
             };
             if (dlg.ShowDialog(this) != true) return;

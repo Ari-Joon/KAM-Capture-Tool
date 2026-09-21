@@ -11,7 +11,7 @@ namespace KamCapture.Settings
     public sealed class AppSettings
     {
         // ---- Capture overlay appearance (the colour wheel lives here) ----
-        public string BorderColor { get; set; } = "#4A7CFF";
+        public string BorderColor { get; set; } = "#D9A93A";
         public double BorderThickness { get; set; } = 2.0;
         public BorderStyleKind BorderStyle { get; set; } = BorderStyleKind.Solid;
         public double DimOpacity { get; set; } = 0.45;
@@ -34,7 +34,7 @@ namespace KamCapture.Settings
 
         // ---- Editor ----
         public double BoardMargin { get; set; } = 260;
-        public string BoardBackground { get; set; } = "#F2F4F8";
+        public string BoardBackground { get; set; } = "#F4F4F2";
         public double DefaultFontSize { get; set; } = 18;
         public string DefaultInkColor { get; set; } = "#E5342A";
         public double DefaultInkThickness { get; set; } = 3;
@@ -100,12 +100,70 @@ namespace KamCapture.Settings
                 Current = new AppSettings();
             }
 
-            if (string.IsNullOrWhiteSpace(Current.SaveFolder))
-                Current.SaveFolder = DefaultPicturesFolder("KAM Captures");
-            if (string.IsNullOrWhiteSpace(Current.RecordFolder))
-                Current.RecordFolder = DefaultVideosFolder("KAM Recordings");
+            // Captures stay on this machine. If the folder is empty, or points
+            // into a OneDrive sync root because Windows redirected Pictures,
+            // put it back on local disk.
+            var captures = Relocate(Current.SaveFolder,
+                Services.OutputFolder.DefaultCaptures(), ".png");
+            var recordings = Relocate(Current.RecordFolder,
+                Services.OutputFolder.DefaultRecordings(), ".mp4");
+
+            // Write the move back out, or the settings file keeps pointing at a
+            // folder nothing is being saved to.
+            bool moved = !string.Equals(captures, Current.SaveFolder, StringComparison.OrdinalIgnoreCase)
+                      || !string.Equals(recordings, Current.RecordFolder, StringComparison.OrdinalIgnoreCase);
+
+            Current.SaveFolder = captures;
+            Current.RecordFolder = recordings;
+            if (moved) Current.Save();
 
             return Current;
+        }
+
+        /// <summary>
+        /// Keep output local and organised. An empty setting, one Windows has
+        /// redirected into OneDrive, or one of the old flat folders all move to
+        /// the current default — bringing anything this tool wrote along with
+        /// them. A folder the user deliberately chose is left alone.
+        /// </summary>
+        private static string Relocate(string configured, string localDefault, string extension)
+        {
+            if (string.IsNullOrWhiteSpace(configured)) return localDefault;
+
+            if (Services.OutputFolder.IsSynced(configured) ||
+                Services.OutputFolder.IsLegacyLayout(configured))
+            {
+                Services.OutputFolder.MigrateLegacy(configured, localDefault, extension);
+                return localDefault;
+            }
+
+            return configured;
+        }
+
+        /// <summary>
+        /// The folder captures will actually be written to, created and proven
+        /// writable first. If the configured one cannot be used — or has been
+        /// redirected into OneDrive — this returns a local one instead and
+        /// remembers it, so a capture is never lost to a folder problem and
+        /// never quietly turned into an upload.
+        /// </summary>
+        public string EnsureSaveFolder() =>
+            Remember(Services.OutputFolder.Resolve(SaveFolder, Services.OutputFolder.CapturesLeaf),
+                     SaveFolder, v => SaveFolder = v, "Capture");
+
+        public string EnsureRecordFolder() =>
+            Remember(Services.OutputFolder.Resolve(RecordFolder, Services.OutputFolder.RecordingsLeaf),
+                     RecordFolder, v => RecordFolder = v, "Recording");
+
+        private string Remember(string resolved, string current, Action<string> set, string what)
+        {
+            if (!string.Equals(resolved, current, StringComparison.OrdinalIgnoreCase))
+            {
+                set(resolved);
+                Save();
+                Services.Log.Info($"{what} folder moved to {resolved}");
+            }
+            return resolved;
         }
 
         public void Save()
@@ -118,19 +176,7 @@ namespace KamCapture.Settings
             catch { /* read-only profile; keep running with in-memory settings */ }
         }
 
-        private static string DefaultPicturesFolder(string leaf)
-        {
-            var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.MyPictures);
-            if (string.IsNullOrEmpty(baseDir)) baseDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            return Path.Combine(baseDir, leaf);
-        }
 
-        private static string DefaultVideosFolder(string leaf)
-        {
-            var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
-            if (string.IsNullOrEmpty(baseDir)) baseDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            return Path.Combine(baseDir, leaf);
-        }
 
         public string BuildFileName(string extension)
         {

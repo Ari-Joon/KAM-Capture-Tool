@@ -92,7 +92,7 @@ namespace KamCapture.Controls
             {
                 Width = 30, Height = 30, CornerRadius = new CornerRadius(5),
                 BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x26, 0x2E, 0x3C)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x2C, 0x2C, 0x33)),
                 Background = new SolidColorBrush(_color)
             };
             Grid.SetColumn(_preview, 0);
@@ -115,7 +115,7 @@ namespace KamCapture.Controls
             foreach (var hexCode in new[]
             {
                 "#E5342A", "#FF8A00", "#FFD400", "#2BB673", "#00A6C0",
-                "#4A7CFF", "#7A5CFF", "#FF4FA3", "#111111", "#FFFFFF"
+                "#D9A93A", "#7A5CFF", "#FF4FA3", "#111111", "#FFFFFF"
             })
                 presets.Children.Add(Swatch(ColorUtil.Parse(hexCode)));
             root.Children.Add(presets);
@@ -143,7 +143,7 @@ namespace KamCapture.Controls
             Margin = new Thickness(0, 10, 0, 2),
             FontFamily = new FontFamily("Segoe UI"),
             FontSize = 11,
-            Foreground = new SolidColorBrush(Color.FromRgb(0x98, 0xA4, 0xBA))
+            Foreground = new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x94))
         };
 
         private static Slider MakeSlider(double min, double max, double val) => new()
@@ -159,7 +159,7 @@ namespace KamCapture.Controls
                 CornerRadius = new CornerRadius(4),
                 Background = new SolidColorBrush(c),
                 BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x3C, 0x4C)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x3A)),
                 Cursor = Cursors.Hand,
                 ToolTip = ColorUtil.ToHex(c)
             };
@@ -432,7 +432,7 @@ namespace KamCapture.Controls
                 CornerRadius = new CornerRadius(4),
                 Background = new SolidColorBrush(_color),
                 BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x3C, 0x4C)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x3A)),
                 Width = 20, Height = 18
             };
             Content = _chip;

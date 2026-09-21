@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -8,6 +7,7 @@ using KamCapture.Controls;
 using KamCapture.Editor;
 using KamCapture.Interop;
 using KamCapture.Recording;
+using KamCapture.Services;
 using KamCapture.Settings;
 
 namespace KamCapture.UI
@@ -16,8 +16,7 @@ namespace KamCapture.UI
     {
         private readonly AppSettings _cfg;
         private BorderPreview _preview = null!;
-        private ColorButton _borderColor = null!, _dimColor = null!, _handleColor = null!,
-                            _inkColor = null!, _boardColor = null!;
+        private ColorButton _borderColor = null!, _inkColor = null!;
         private HotkeyBox _hkRegion = null!, _hkWindow = null!, _hkFull = null!, _hkRecord = null!;
         private bool _ready;
 
@@ -44,11 +43,9 @@ namespace KamCapture.UI
             _preview = new BorderPreview(_cfg);
             HostPreview.Content = _preview;
 
-            _borderColor = Color(HostBorderColor, _cfg.BorderColor, c => { _cfg.BorderColor = ColorUtil.ToHex(c); _preview.Refresh(); });
-            _dimColor = Color(HostDimColor, _cfg.DimColor, c => { _cfg.DimColor = ColorUtil.ToHex(c); _preview.Refresh(); });
-            _handleColor = Color(HostHandleColor, _cfg.HandleColor, c => { _cfg.HandleColor = ColorUtil.ToHex(c); _preview.Refresh(); });
-            _inkColor = Color(HostInkColor, _cfg.DefaultInkColor, _ => { });
-            _boardColor = Color(HostBoardColor, _cfg.BoardBackground, _ => { });
+            _borderColor = Colour(HostBorderColor, _cfg.BorderColor,
+                c => { _cfg.BorderColor = ColorUtil.ToHex(c); _preview.Refresh(); });
+            _inkColor = Colour(HostInkColor, _cfg.DefaultInkColor, _ => { });
 
             CmbBorderStyle.ItemsSource = new[]
             {
@@ -67,8 +64,16 @@ namespace KamCapture.UI
 
             CmbDelay.ItemsSource = new[]
             {
-                new Item("None", 0), new Item("1 second", 1), new Item("3 seconds", 3),
+                new Item("No delay", 0), new Item("1 second", 1), new Item("3 seconds", 3),
                 new Item("5 seconds", 5), new Item("10 seconds", 10),
+            };
+
+            CmbSandbox.ItemsSource = new[]
+            {
+                new Item("Tight", 40.0),
+                new Item("Comfortable", 260.0),
+                new Item("Wide", 520.0),
+                new Item("Extra wide", 900.0),
             };
 
             CmbExportScale.ItemsSource = new[]
@@ -82,22 +87,13 @@ namespace KamCapture.UI
                 new Item("48 fps", 48), new Item("60 fps", 60),
             };
 
-            CmbEncoder.ItemsSource = new[]
-            {
-                new Item("Automatic", "auto"),
-                new Item("Software (libx264)", "libx264"),
-                new Item("NVIDIA (h264_nvenc)", "h264_nvenc"),
-                new Item("Intel Quick Sync (h264_qsv)", "h264_qsv"),
-                new Item("AMD (h264_amf)", "h264_amf"),
-            };
-
             _hkRegion = Hotkey(HostHkRegion);
             _hkWindow = Hotkey(HostHkWindow);
             _hkFull = Hotkey(HostHkFull);
             _hkRecord = Hotkey(HostHkRecord);
         }
 
-        private static ColorButton Color(ContentControl host, string hex, Action<System.Windows.Media.Color> onChange)
+        private static ColorButton Colour(ContentControl host, string hex, Action<System.Windows.Media.Color> onChange)
         {
             var b = new ColorButton { Color = ColorUtil.Parse(hex) };
             b.ColorChanged += c => onChange(c);
@@ -121,31 +117,28 @@ namespace KamCapture.UI
 
         private void LoadFrom(AppSettings c)
         {
+            Select(CmbDefaultMode, c.DefaultMode);
+            Select(CmbDelay, c.DelaySeconds);
+            ChkClipboard.IsChecked = c.CopyToClipboardOnCapture;
+            ChkOpenEditor.IsChecked = c.OpenEditorAfterCapture;
+            ChkAutoSave.IsChecked = c.AutoSave;
+            ChkCursor.IsChecked = c.IncludeCursor;
+            TxtSaveFolder.Text = c.SaveFolder;
+
             SldBorderThickness.Value = c.BorderThickness;
             SldDim.Value = c.DimOpacity;
             Select(CmbBorderStyle, c.BorderStyle);
             ChkCrosshair.IsChecked = c.ShowCrosshair;
             ChkMagnifier.IsChecked = c.ShowMagnifier;
             ChkDimensions.IsChecked = c.ShowDimensions;
-            ChkThirds.IsChecked = c.ShowRuleOfThirds;
-
-            Select(CmbDefaultMode, c.DefaultMode);
-            Select(CmbDelay, c.DelaySeconds);
-            ChkCursor.IsChecked = c.IncludeCursor;
-            ChkClipboard.IsChecked = c.CopyToClipboardOnCapture;
-            ChkAutoSave.IsChecked = c.AutoSave;
-            ChkOpenEditor.IsChecked = c.OpenEditorAfterCapture;
-            TxtSaveFolder.Text = c.SaveFolder;
-            TxtFileName.Text = c.FileNameTemplate;
 
             SldInkThickness.Value = c.DefaultInkThickness;
             SldFontSize.Value = c.DefaultFontSize;
-            ChkGrid.IsChecked = c.ShowBoardGrid;
+            Select(CmbSandbox, NearestSandbox(c.BoardMargin));
             Select(CmbExportScale, c.ExportScale);
 
             Select(CmbFps, c.RecordFps);
             SldQuality.Value = c.RecordQuality;
-            Select(CmbEncoder, c.VideoEncoder);
             ChkRecordCursor.IsChecked = c.RecordCursor;
             TxtRecordFolder.Text = c.RecordFolder;
             TxtFfmpeg.Text = c.FfmpegPath;
@@ -162,6 +155,14 @@ namespace KamCapture.UI
             UpdateLabels();
             CheckFfmpeg();
         }
+
+        private static double NearestSandbox(double margin) => margin switch
+        {
+            <= 120 => 40.0,
+            <= 380 => 260.0,
+            <= 700 => 520.0,
+            _ => 900.0
+        };
 
         private void UpdateLabels()
         {
@@ -180,12 +181,9 @@ namespace KamCapture.UI
         private void CheckFfmpeg()
         {
             var path = FfmpegLocator.Resolve(TxtFfmpeg.Text);
-            if (path == null)
-            {
-                LblFfmpegState.Text = "Not found. Video recording needs ffmpeg — install it with:  winget install Gyan.FFmpeg";
-                return;
-            }
-            LblFfmpegState.Text = "Found: " + path;
+            LblFfmpegState.Text = path == null
+                ? "Not found. Recording needs ffmpeg:  winget install Gyan.FFmpeg"
+                : "Found: " + path;
         }
 
         // ---------------- live preview ----------------
@@ -205,7 +203,6 @@ namespace KamCapture.UI
             _cfg.ShowCrosshair = ChkCrosshair.IsChecked == true;
             _cfg.ShowMagnifier = ChkMagnifier.IsChecked == true;
             _cfg.ShowDimensions = ChkDimensions.IsChecked == true;
-            _cfg.ShowRuleOfThirds = ChkThirds.IsChecked == true;
             _preview.Refresh();
         }
 
@@ -231,7 +228,17 @@ namespace KamCapture.UI
         {
             var dlg = new Microsoft.Win32.OpenFolderDialog { Title = "Choose a folder" };
             if (Directory.Exists(target.Text)) dlg.InitialDirectory = target.Text;
-            if (dlg.ShowDialog(this) == true) target.Text = dlg.FolderName;
+            if (dlg.ShowDialog(this) != true) return;
+
+            if (OutputFolder.IsSynced(dlg.FolderName))
+            {
+                var answer = MessageBox.Show(
+                    "That folder is inside OneDrive, so every capture would be uploaded.\n\nUse it anyway?",
+                    "KAM Capture Tool", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (answer != MessageBoxResult.Yes) return;
+            }
+
+            target.Text = dlg.FolderName;
         }
 
         private void OnFindFfmpeg(object sender, RoutedEventArgs e)
@@ -262,36 +269,30 @@ namespace KamCapture.UI
         {
             var c = _cfg;
 
+            if (CmbDefaultMode.SelectedItem is Item { Value: SnipMode dm }) c.DefaultMode = dm;
+            if (CmbDelay.SelectedItem is Item { Value: int delay }) c.DelaySeconds = delay;
+            c.CopyToClipboardOnCapture = ChkClipboard.IsChecked == true;
+            c.OpenEditorAfterCapture = ChkOpenEditor.IsChecked == true;
+            c.AutoSave = ChkAutoSave.IsChecked == true;
+            c.IncludeCursor = ChkCursor.IsChecked == true;
+            c.SaveFolder = TxtSaveFolder.Text.Trim();
+
             c.BorderColor = ColorUtil.ToHex(_borderColor.Color);
-            c.DimColor = ColorUtil.ToHex(_dimColor.Color);
-            c.HandleColor = ColorUtil.ToHex(_handleColor.Color);
             c.BorderThickness = SldBorderThickness.Value;
             c.DimOpacity = SldDim.Value;
             if (CmbBorderStyle.SelectedItem is Item { Value: BorderStyleKind bs }) c.BorderStyle = bs;
             c.ShowCrosshair = ChkCrosshair.IsChecked == true;
             c.ShowMagnifier = ChkMagnifier.IsChecked == true;
             c.ShowDimensions = ChkDimensions.IsChecked == true;
-            c.ShowRuleOfThirds = ChkThirds.IsChecked == true;
-
-            if (CmbDefaultMode.SelectedItem is Item { Value: SnipMode dm }) c.DefaultMode = dm;
-            if (CmbDelay.SelectedItem is Item { Value: int delay }) c.DelaySeconds = delay;
-            c.IncludeCursor = ChkCursor.IsChecked == true;
-            c.CopyToClipboardOnCapture = ChkClipboard.IsChecked == true;
-            c.AutoSave = ChkAutoSave.IsChecked == true;
-            c.OpenEditorAfterCapture = ChkOpenEditor.IsChecked == true;
-            c.SaveFolder = TxtSaveFolder.Text.Trim();
-            c.FileNameTemplate = TxtFileName.Text.Trim();
 
             c.DefaultInkColor = ColorUtil.ToHex(_inkColor.Color);
-            c.BoardBackground = ColorUtil.ToHex(_boardColor.Color);
             c.DefaultInkThickness = SldInkThickness.Value;
             c.DefaultFontSize = SldFontSize.Value;
-            c.ShowBoardGrid = ChkGrid.IsChecked == true;
+            if (CmbSandbox.SelectedItem is Item { Value: double margin }) c.BoardMargin = margin;
             if (CmbExportScale.SelectedItem is Item { Value: int es }) c.ExportScale = es;
 
             if (CmbFps.SelectedItem is Item { Value: int fps }) c.RecordFps = fps;
             c.RecordQuality = (int)Math.Round(SldQuality.Value);
-            if (CmbEncoder.SelectedItem is Item { Value: string enc }) c.VideoEncoder = enc;
             c.RecordCursor = ChkRecordCursor.IsChecked == true;
             c.RecordFolder = TxtRecordFolder.Text.Trim();
             c.FfmpegPath = TxtFfmpeg.Text.Trim();
@@ -317,7 +318,7 @@ namespace KamCapture.UI
 
         private void OnCancel(object sender, RoutedEventArgs e)
         {
-            // The preview edits the live settings object, so put it back.
+            // The live preview edits the settings object directly, so put it back.
             AppSettings.Load();
             DialogResult = false;
             Close();
@@ -332,16 +333,12 @@ namespace KamCapture.UI
             _ready = false;
 
             _borderColor.Color = ColorUtil.Parse(d.BorderColor);
-            _dimColor.Color = ColorUtil.Parse(d.DimColor);
-            _handleColor.Color = ColorUtil.Parse(d.HandleColor);
             _inkColor.Color = ColorUtil.Parse(d.DefaultInkColor);
-            _boardColor.Color = ColorUtil.Parse(d.BoardBackground);
 
             _cfg.BorderColor = d.BorderColor;
-            _cfg.DimColor = d.DimColor;
-            _cfg.HandleColor = d.HandleColor;
             _cfg.BorderStyle = d.BorderStyle;
 
+            // Keep the folders they chose; defaults should not relocate their files.
             d.SaveFolder = _cfg.SaveFolder;
             d.RecordFolder = _cfg.RecordFolder;
             d.FfmpegPath = _cfg.FfmpegPath;

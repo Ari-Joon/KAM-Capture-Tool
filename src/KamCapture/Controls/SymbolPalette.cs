@@ -45,7 +45,7 @@ namespace KamCapture.Controls
             var caret = new Path
             {
                 Data = Geometry.Parse("M 0,0 L 4.5,5 L 9,0"),
-                Stroke = new SolidColorBrush(Color.FromRgb(0x98, 0xA4, 0xBA)),
+                Stroke = new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x94)),
                 StrokeThickness = 1.6,
                 Margin = new Thickness(8, 2, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
@@ -102,7 +102,7 @@ namespace KamCapture.Controls
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 14,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromRgb(0xE6, 0xEA, 0xF2)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0xF7, 0xF7, 0xF5)),
                 Margin = new Thickness(0, 0, 0, 2)
             };
             stack.Children.Add(title);
@@ -112,7 +112,7 @@ namespace KamCapture.Controls
                 Text = "Pick one, then drag on the board to size it. Click once for a default size.",
                 FontFamily = new FontFamily("Segoe UI"),
                 FontSize = 11,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x98, 0xA4, 0xBA)),
+                Foreground = new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x94)),
                 Margin = new Thickness(0, 0, 0, 8),
                 TextWrapping = TextWrapping.Wrap,
                 MaxWidth = 330
@@ -126,7 +126,7 @@ namespace KamCapture.Controls
                     Text = group.Key,
                     FontFamily = new FontFamily("Segoe UI"),
                     FontSize = 11,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x98, 0xA4, 0xBA)),
+                    Foreground = new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x94)),
                     Margin = new Thickness(0, 8, 0, 4)
                 });
 
@@ -170,12 +170,12 @@ namespace KamCapture.Controls
                 BorderBrush = Brushes.Transparent,
                 Cursor = Cursors.Hand,
                 ToolTip = def.Label,
-                Child = Glyph(def, 22, new SolidColorBrush(Color.FromRgb(0xE6, 0xEA, 0xF2)))
+                Child = Glyph(def, 22, new SolidColorBrush(Color.FromRgb(0xF7, 0xF7, 0xF5)))
             };
 
             var idle = Brushes.Transparent;
-            var hover = new SolidColorBrush(Color.FromRgb(0x23, 0x2B, 0x3A));
-            var accent = new SolidColorBrush(Color.FromRgb(0x4A, 0x7C, 0xFF));
+            var hover = new SolidColorBrush(Color.FromRgb(0x22, 0x22, 0x28));
+            var accent = new SolidColorBrush(Color.FromRgb(0xD9, 0xA9, 0x3A));
 
             void Refresh() => host.BorderBrush = def.Name == _symbol ? accent : Brushes.Transparent;
             Refresh();

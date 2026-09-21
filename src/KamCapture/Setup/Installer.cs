@@ -158,6 +158,27 @@ namespace KamCapture.Setup
             return targetExe;
         }
 
+        /// <summary>
+        /// Delete the copy displaced by the last update. It cannot be removed
+        /// during the install because it may still be running, so it is cleared
+        /// the next time the new copy starts.
+        /// </summary>
+        public static void CleanUpPreviousVersion()
+        {
+            try
+            {
+                var dir = CurrentDir;
+                if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+
+                foreach (var stale in Directory.GetFiles(dir, "*.old"))
+                {
+                    try { File.Delete(stale); }
+                    catch { /* still locked; it will go on a later run */ }
+                }
+            }
+            catch { }
+        }
+
         public static void Uninstall()
         {
             var dir = InstalledDir ?? CurrentDir;

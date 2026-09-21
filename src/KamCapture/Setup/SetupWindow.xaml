@@ -15,14 +15,16 @@
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
             <Grid Width="52" Height="52" VerticalAlignment="Center">
-                <Ellipse Fill="#FF0A0D14"/>
-                <Path Stroke="#FF4A7CFF" StrokeThickness="3.5" StrokeLineJoin="Round" StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round" Stretch="None" Width="52" Height="52"
-                      Data="M12,19.5 L12,12 L19.5,12 M32.5,12 L40,12 L40,19.5 M12,32.5 L12,40 L19.5,40 M40,32.5 L40,40 L32.5,40"/>
-                <Path Fill="#FF3A63D8" Stretch="None" Width="52" Height="52"
-                      Data="M19.2,32.8 L32.8,19.2 L36.1,22.5 L22.5,36.1 Z"/>
-                <Path Fill="#FF9CBEFF" Stretch="None" Width="52" Height="52"
-                      Data="M19.2,32.8 L22.5,36.1 L15.9,38.4 Z"/>
+                <Ellipse Fill="#FF0C0C0E"/>
+                <Path Stroke="#FFF7F7F5" StrokeThickness="2.8" StrokeLineJoin="Round"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="None"
+                      Width="52" Height="52" Data="M10.2,17.9 L10.2,10.2 L17.9,10.2 M34.1,10.2 L41.8,10.2 L41.8,17.9 M10.2,34.1 L10.2,41.8 L17.9,41.8 M41.8,34.1 L41.8,41.8 L34.1,41.8"/>
+                <TextBlock Text="KAM" Foreground="#FFD9A93A" FontFamily="Segoe UI" FontSize="11"
+                           FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Top"
+                           Margin="0,12.4,0,0"/>
+                <Path Fill="#FFD9A93A" Stretch="None" Width="52" Height="52" Data="M21.9,32.1 L36.1,32.1 L36.1,37.7 L21.9,37.7 Z"/>
+                <Path Fill="#FF0C0C0E" Stretch="None" Width="52" Height="52" Data="M21.0,32.1 L21.9,32.1 L21.9,37.7 L21.0,37.7 Z"/>
+                <Path Fill="#FFF7F7F5" Stretch="None" Width="52" Height="52" Data="M21.0,32.1 L21.0,37.7 L14.8,34.9 Z"/>
             </Grid>
             <StackPanel Margin="15,0,0,0" VerticalAlignment="Center">
                 <TextBlock Text="KAM Capture Tool" FontSize="22" FontWeight="SemiBold"/>
@@ -55,7 +57,7 @@
         <StackPanel Grid.Row="2" VerticalAlignment="Bottom" Margin="0,18,0,0">
             <TextBlock x:Name="LblStatus" Style="{StaticResource Label}" TextWrapping="Wrap" MinHeight="34"/>
             <ProgressBar x:Name="Bar" Height="4" Visibility="Collapsed" IsIndeterminate="True"
-                         Background="#FF10151E" Foreground="{StaticResource Accent}" BorderThickness="0"/>
+                         Background="#FF121216" Foreground="{StaticResource Accent}" BorderThickness="0"/>
         </StackPanel>
 
         <DockPanel Grid.Row="3" LastChildFill="False" Margin="0,18,0,18">

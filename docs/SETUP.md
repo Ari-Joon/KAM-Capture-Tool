@@ -127,6 +127,7 @@ After releasing the mouse a small bar appears: **Annotate**, **Copy**, **Save**,
 | `Ctrl+D` | Duplicate |
 | `Delete` | Remove |
 | Arrow keys | Nudge, `Shift` for ten |
+| Right-click the board | Duplicate, delete, bring to front, send to back, select all, save as |
 
 ### View
 

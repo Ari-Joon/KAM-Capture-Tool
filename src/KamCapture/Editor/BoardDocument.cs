@@ -19,7 +19,7 @@ namespace KamCapture.Editor
         public Size BoardSize { get; set; } = new Size(1200, 800);
         public List<AnnItem> Items { get; } = new();
 
-        public string BoardColor { get; set; } = "#F2F4F8";
+        public string BoardColor { get; set; } = "#F4F4F2";
         public bool ShowGrid { get; set; }
 
         /// <summary>The capture's true pixel size, before any board scaling.</summary>

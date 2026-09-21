@@ -590,7 +590,7 @@ namespace KamCapture.Editor
                 case EditTool.Crop:
                     _drawing = new RectItem
                     {
-                        StrokeColor = "#4A7CFF", Thickness = 1.5 / Zoom,
+                        StrokeColor = "#D9A93A", Thickness = 1.5 / Zoom,
                         A = board, B = board
                     };
                     break;
@@ -1025,11 +1025,11 @@ namespace KamCapture.Editor
                 FontStyle = item.Italic ? FontStyles.Italic : FontStyles.Normal,
                 Foreground = new SolidColorBrush(item.Ink),
                 Background = new SolidColorBrush(Color.FromArgb(235, 255, 255, 255)),
-                BorderBrush = new SolidColorBrush(ColorUtil.Parse("#4A7CFF")),
+                BorderBrush = new SolidColorBrush(ColorUtil.Parse("#D9A93A")),
                 BorderThickness = new Thickness(1.5),
                 Padding = new Thickness(item.Padding * Zoom),
                 MinWidth = 60,
-                SelectionBrush = new SolidColorBrush(ColorUtil.Parse("#4A7CFF")),
+                SelectionBrush = new SolidColorBrush(ColorUtil.Parse("#D9A93A")),
                 CaretBrush = new SolidColorBrush(item.Ink),
                 Tag = "board-text-editor"
             };
@@ -1240,7 +1240,7 @@ namespace KamCapture.Editor
 
         private void DrawAdorners(DrawingContext dc)
         {
-            var accent = ColorUtil.Parse("#4A7CFF");
+            var accent = ColorUtil.Parse("#D9A93A");
 
             if (_marquee)
             {
@@ -1316,7 +1316,7 @@ namespace KamCapture.Editor
                     12, Brushes.White, VisualTreeHelper.GetDpi(this).PixelsPerDip);
 
                 var lr = new Rect(box.X, box.Y - label.Height - 8, label.Width + 12, label.Height + 6);
-                var lbg = new SolidColorBrush(Color.FromArgb(235, 15, 18, 25));
+                var lbg = new SolidColorBrush(Color.FromArgb(235, 12, 12, 14));
                 lbg.Freeze();
                 dc.DrawRoundedRectangle(lbg, null, lr, 4, 4);
                 dc.DrawText(label, new Point(lr.X + 6, lr.Y + 3));

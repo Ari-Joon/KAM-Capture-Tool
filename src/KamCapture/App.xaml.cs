@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using System.Windows;
 using KamCapture.Services;
 using KamCapture.Setup;
@@ -13,7 +12,6 @@ namespace KamCapture
 {
     public partial class App : Application
     {
-        private static Mutex? _single;
         private static HotkeyService? _hotkeys;
         private static Forms.NotifyIcon? _tray;
         private static AppSettings _cfg = new();
@@ -23,15 +21,18 @@ namespace KamCapture
         {
             base.OnStartup(e);
 
-            // One instance owns the hotkeys; a second launch just wakes the first.
-            _single = new Mutex(true, @"Local\KAM.CaptureTool.SingleInstance", out bool created);
-            if (!created)
+            // Clear the copy displaced by the last update, whatever mode we run in.
+            Installer.CleanUpPreviousVersion();
+
+            // One instance owns the global shortcuts. A second launch hands its
+            // arguments over and exits quietly rather than showing a dialog.
+            if (!SingleInstance.Claim())
             {
-                MessageBox.Show("KAM Capture Tool is already running — look in the notification area.",
-                    "KAM Capture Tool", MessageBoxButton.OK, MessageBoxImage.Information);
+                SingleInstance.HandOver(e.Args);
                 Shutdown();
                 return;
             }
+            SingleInstance.SecondInstance += OnSecondInstance;
 
             DispatcherUnhandledException += (_, args) =>
             {
@@ -61,6 +62,13 @@ namespace KamCapture
                     ? selfTest[(selfTest.IndexOf('=') + 1)..]
                     : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "kam-selftest.png");
                 Environment.ExitCode = SelfTest.Run(target);
+                Shutdown();
+                return;
+            }
+
+            if (e.Args.Any(a => a.Equals("--savetest", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = SelfTest.SaveTest();
                 Shutdown();
                 return;
             }
@@ -169,6 +177,25 @@ namespace KamCapture
             _cfg.SkipSetupPrompt = true;
             _cfg.Save();
             return true;
+        }
+
+        /// <summary>Another copy was launched; do what it was asked to do.</summary>
+        private static void OnSecondInstance(string[] args)
+        {
+            var mode = args.FirstOrDefault(a => a.StartsWith("--capture=", StringComparison.OrdinalIgnoreCase));
+            if (mode != null && Enum.TryParse<SnipMode>(mode["--capture=".Length..], true, out var m))
+            {
+                Start(m);
+                return;
+            }
+
+            if (args.Any(a => a.Equals("--record", StringComparison.OrdinalIgnoreCase)))
+            {
+                _ = RecordingController.StartAsync(_cfg);
+                return;
+            }
+
+            ShowMain();
         }
 
         // ---------------- tray ----------------
@@ -295,7 +322,7 @@ namespace KamCapture
                 _tray.Visible = false;
                 _tray.Dispose();
             }
-            try { _single?.ReleaseMutex(); } catch { }
+            SingleInstance.Release();
             base.OnExit(e);
         }
     }

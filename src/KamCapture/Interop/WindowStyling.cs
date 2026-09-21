@@ -34,10 +34,10 @@ namespace KamCapture.Interop
                 int caption = Bgr(0x0F, 0x12, 0x19);
                 DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
 
-                int border = Bgr(0x26, 0x2E, 0x3C);
+                int border = Bgr(0x2C, 0x2C, 0x33);
                 DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ref border, sizeof(int));
 
-                int text = Bgr(0xE6, 0xEA, 0xF2);
+                int text = Bgr(0xF7, 0xF7, 0xF5);
                 DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, ref text, sizeof(int));
             }
 
