@@ -38,6 +38,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\kam-capture.ico" />
+    <Resource Include="Assets\kam-capture.png" />
   </ItemGroup>
 
 </Project>

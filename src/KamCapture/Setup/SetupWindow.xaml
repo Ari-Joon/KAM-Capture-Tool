@@ -14,18 +14,9 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,20">
-            <Grid Width="52" Height="52" VerticalAlignment="Center">
-                <Ellipse Fill="#FF0C0C0E"/>
-                <Path Stroke="#FFF7F7F5" StrokeThickness="2.8" StrokeLineJoin="Round"
-                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" Stretch="None"
-                      Width="52" Height="52" Data="M10.2,17.9 L10.2,10.2 L17.9,10.2 M34.1,10.2 L41.8,10.2 L41.8,17.9 M10.2,34.1 L10.2,41.8 L17.9,41.8 M41.8,34.1 L41.8,41.8 L34.1,41.8"/>
-                <TextBlock Text="KAM" Foreground="#FFD9A93A" FontFamily="Segoe UI" FontSize="11"
-                           FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Top"
-                           Margin="0,12.4,0,0"/>
-                <Path Fill="#FFD9A93A" Stretch="None" Width="52" Height="52" Data="M21.9,32.1 L36.1,32.1 L36.1,37.7 L21.9,37.7 Z"/>
-                <Path Fill="#FF0C0C0E" Stretch="None" Width="52" Height="52" Data="M21.0,32.1 L21.9,32.1 L21.9,37.7 L21.0,37.7 Z"/>
-                <Path Fill="#FFF7F7F5" Stretch="None" Width="52" Height="52" Data="M21.0,32.1 L21.0,37.7 L14.8,34.9 Z"/>
-            </Grid>
+            <Image Source="pack://application:,,,/Assets/kam-capture.png"
+                   Width="52" Height="52" VerticalAlignment="Center"
+                   RenderOptions.BitmapScalingMode="HighQuality"/>
             <StackPanel Margin="15,0,0,0" VerticalAlignment="Center">
                 <TextBlock Text="KAM Capture Tool" FontSize="22" FontWeight="SemiBold"/>
                 <TextBlock x:Name="LblVersion" Style="{StaticResource Label}" Margin="0,3,0,0"/>

@@ -1,19 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="kamCaptureTitle">
   <title id="kamCaptureTitle">KAM Capture Tool</title>
-  <circle cx="128" cy="128" r="128" fill="#0C0C0E"/>
-  <g fill="none" stroke="#F7F7F5" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M50 88 L50 50 L88 50"/>
-    <path d="M168 50 L206 50 L206 88"/>
-    <path d="M50 168 L50 206 L88 206"/>
-    <path d="M206 168 L206 206 L168 206"/>
-  </g>
-  <text x="128" y="102" text-anchor="middle" dominant-baseline="central"
+  <rect x="0" y="0" width="256" height="256" rx="56" ry="56" fill="#0C0C0E"/>
+  <rect x="74" y="50" width="60" height="36" rx="10" ry="10" fill="#F7F7F5"/>
+  <rect x="26" y="76" width="204" height="134" rx="24" ry="24" fill="#F7F7F5"/>
+  <circle cx="196" cy="68" r="12" fill="#D9A93A"/>
+  <circle cx="128" cy="143" r="52" fill="none" stroke="#D9A93A" stroke-width="13"/>
+  <text x="128" y="143" text-anchor="middle" dominant-baseline="central"
         font-family="Segoe UI, Inter, Helvetica, Arial, sans-serif"
-        font-size="52" font-weight="700" letter-spacing="4" fill="#D9A93A">KAM</text>
-  <g transform="translate(128 172) rotate(180)">
-    <rect x="-49.7" y="-13.8" width="69.9" height="27.6" fill="#D9A93A"/>
-    <rect x="20.2" y="-13.8" width="4.6" height="27.6" fill="#0C0C0E"/>
-    <path d="M24.8 -13.8 L24.8 13.8 L55.2 0 Z" fill="#F7F7F5"/>
-    <path d="M46 -4.5 L46 4.5 L55.2 0 Z" fill="#0C0C0E"/>
-  </g>
+        font-size="30" font-weight="700" letter-spacing="2" fill="#0C0C0E">KAM</text>
 </svg>
