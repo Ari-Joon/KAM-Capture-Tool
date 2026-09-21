@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Generate icon
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-icon.ps1
+
+      - name: Self-test
+        run: dotnet run --project src/KamCapture -c Release -- --selftest=selftest.png
+
+      - name: Publish
+        run: >
+          dotnet publish src/KamCapture/KamCapture.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o dist/app --nologo
+
+      # Unsigned builds are worth checking by hand, so publish the hash with them.
+      - name: Checksum
+        run: |
+          $exe = 'dist/app/KamCapture.exe'
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          "$hash  KamCapture.exe" | Out-File -Encoding ascii dist/app/SHA256SUMS.txt
+          Write-Host $hash
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/app/KamCapture.exe
+            dist/app/SHA256SUMS.txt
+          generate_release_notes: true
+          body: |
+            Download `KamCapture.exe` and run it. It asks where to install, or
+            will happily run where it stands.
+
+            The whole application is that one file — the .NET runtime is inside
+            it, so there is nothing to install first.
+
+            Video recording additionally needs ffmpeg:
+            `winget install Gyan.FFmpeg`
+
+            The executable is not code signed, so SmartScreen will warn on first
+            run. `SHA256SUMS.txt` is published alongside it.

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # The icon is generated rather than committed, so it has to be made first.
+      - name: Generate icon
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-icon.ps1
+
+      - name: Build
+        run: dotnet build src/KamCapture/KamCapture.csproj -c Release --nologo -warnaserror:NU1605
+
+      - name: Self-test
+        run: |
+          dotnet run --project src/KamCapture -c Release --no-build -- --selftest=selftest.png
+          if (-not (Test-Path selftest.png)) { throw 'self-test produced no output' }
+          $size = (Get-Item selftest.png).Length
+          Write-Host "self-test image: $([math]::Round($size/1kb,1)) KB"
+
+      - name: Publish
+        run: >
+          dotnet publish src/KamCapture/KamCapture.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o dist/app --nologo
+
+      - name: Check the published executable
+        run: |
+          $exe = 'dist/app/KamCapture.exe'
+          if (-not (Test-Path $exe)) { throw 'no executable was published' }
+          $mb = [math]::Round((Get-Item $exe).Length / 1MB, 1)
+          Write-Host "published: $exe ($mb MB)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kam-capture-tool
+          path: |
+            dist/app/KamCapture.exe
+            selftest.png
