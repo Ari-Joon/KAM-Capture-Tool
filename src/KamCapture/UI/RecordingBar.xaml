@@ -1,0 +1,79 @@
+<Window x:Class="KamCapture.UI.RecordingBar"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KAM Capture Tool — Recording"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True" ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight" WindowStartupLocation="Manual"
+        UseLayoutRounding="True">
+
+    <Border Background="#F20F1219" BorderBrush="{StaticResource Edge}" BorderThickness="1"
+            CornerRadius="10" Padding="10,7" MouseLeftButtonDown="OnDragBar">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.55" Color="Black"/>
+        </Border.Effect>
+
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+
+            <!-- state + clock -->
+            <Ellipse x:Name="DotRec" Width="11" Height="11" Fill="#E5342A" VerticalAlignment="Center"/>
+            <TextBlock x:Name="LblTime" Text="00:00" Margin="9,0,0,0" VerticalAlignment="Center"
+                       FontFamily="Consolas" FontSize="15" FontWeight="Bold" MinWidth="54"/>
+            <TextBlock x:Name="LblTarget" Style="{StaticResource Label}" Margin="10,0,0,0"
+                       VerticalAlignment="Center" MaxWidth="180" TextTrimming="CharacterEllipsis"/>
+
+            <Border Width="1" Background="{StaticResource Edge}" Margin="12,3"/>
+
+            <Button x:Name="BtnPause" Content="Pause" MinWidth="70" Click="OnPause"
+                    ToolTip="Pause the recording"/>
+            <Button x:Name="BtnStop" Style="{StaticResource PrimaryButton}" Content="Stop"
+                    Margin="6,0,0,0" MinWidth="70" Click="OnStop" ToolTip="Finish and save"/>
+
+            <Border Width="1" Background="{StaticResource Edge}" Margin="12,3"/>
+
+            <!-- system audio, switchable live -->
+            <ToggleButton x:Name="TglSystem" Style="{StaticResource ToolToggle}" Width="36" Height="30"
+                          Click="OnSystemToggled" ToolTip="System audio — what the computer is playing">
+                <Path Data="M4,8 L8,8 L13,4 L13,16 L8,12 L4,12 Z M15.5,7 A4,4 0 0 1 15.5,13"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                      StrokeThickness="1.5" Fill="Transparent" StrokeLineJoin="Round"
+                      Width="20" Height="20" Stretch="None"/>
+            </ToggleButton>
+            <Slider x:Name="SldSystemGain" Width="66" Minimum="0" Maximum="2" Value="1"
+                    Margin="6,0,0,0" VerticalAlignment="Center"
+                    ValueChanged="OnSystemGain" ToolTip="System audio level"/>
+
+            <Border Width="1" Background="{StaticResource Edge}" Margin="12,3"/>
+
+            <!-- microphone, switchable live -->
+            <ToggleButton x:Name="TglMic" Style="{StaticResource ToolToggle}" Width="36" Height="30"
+                          Click="OnMicToggled" ToolTip="Microphone">
+                <Path Data="M10,3 A2.6,2.6 0 0 1 12.6,5.6 L12.6,10 A2.6,2.6 0 0 1 7.4,10 L7.4,5.6 A2.6,2.6 0 0 1 10,3 Z M5,10 A5,5 0 0 0 15,10 M10,15 L10,17.5"
+                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                      StrokeThickness="1.5" Fill="Transparent" StrokeLineJoin="Round" StrokeStartLineCap="Round"
+                      Width="20" Height="20" Stretch="None"/>
+            </ToggleButton>
+            <ComboBox x:Name="CmbMic" Width="168" Margin="6,0,0,0"
+                      SelectionChanged="OnMicDeviceChanged"
+                      ToolTip="Change the microphone without interrupting the recording"/>
+            <Slider x:Name="SldMicGain" Width="66" Minimum="0" Maximum="3" Value="1"
+                    Margin="6,0,0,0" VerticalAlignment="Center"
+                    ValueChanged="OnMicGain" ToolTip="Microphone level"/>
+
+            <Border Background="#FF10151E" CornerRadius="3" Width="6" Height="26" Margin="8,0,0,0"
+                    VerticalAlignment="Center">
+                <Border x:Name="Meter" Background="#FF2BB673" CornerRadius="3" Height="0"
+                        VerticalAlignment="Bottom"/>
+            </Border>
+
+            <Border Width="1" Background="{StaticResource Edge}" Margin="12,3"/>
+
+            <TextBlock x:Name="LblStats" Style="{StaticResource Label}" VerticalAlignment="Center"
+                       MinWidth="92"/>
+
+            <Path Data="M2,4 L14,4 M2,8 L14,8 M2,12 L14,12" Stroke="{StaticResource FgDim}"
+                  StrokeThickness="1.4" Width="16" Height="16" Stretch="None" Margin="10,0,2,0"
+                  VerticalAlignment="Center" ToolTip="Drag to move"/>
+        </StackPanel>
+    </Border>
+</Window>

@@ -1,0 +1,232 @@
+<Window x:Class="KamCapture.UI.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KAM Capture Tool — Settings" Height="760" Width="720"
+        MinHeight="520" MinWidth="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{StaticResource Navy}"
+        UseLayoutRounding="True">
+
+    <Window.Resources>
+        <Style x:Key="Section" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Panel}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Edge}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,14"/>
+        </Style>
+        <Style x:Key="Row" TargetType="StackPanel">
+            <Setter Property="Orientation" Value="Horizontal"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource Label}">
+            <Setter Property="Width" Value="126"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="18,18,18,4">
+            <StackPanel>
+
+                <!-- ===== capture border ===== -->
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Heading}" Text="Selection border"/>
+                        <TextBlock Style="{StaticResource Label}" Margin="0,3,0,12" TextWrapping="Wrap"
+                                   Text="How the capture overlay looks while you are dragging a selection. The preview below is the real thing."/>
+
+                        <ContentControl x:Name="HostPreview" Margin="0,0,0,14"/>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Border colour"/>
+                            <ContentControl x:Name="HostBorderColor" VerticalAlignment="Center"/>
+                            <TextBlock Style="{StaticResource Label}" Text="Style" VerticalAlignment="Center" Margin="20,0,8,0"/>
+                            <ComboBox x:Name="CmbBorderStyle" Width="120" SelectionChanged="OnBorderStyleChanged"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Border thickness"/>
+                            <Slider x:Name="SldBorderThickness" Width="200" Minimum="1" Maximum="8"
+                                    VerticalAlignment="Center" ValueChanged="OnPreviewValueChanged"/>
+                            <TextBlock x:Name="LblBorderThickness" Style="{StaticResource Label}" Width="34"
+                                       Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Dim the rest"/>
+                            <Slider x:Name="SldDim" Width="200" Minimum="0" Maximum="0.9"
+                                    VerticalAlignment="Center" ValueChanged="OnPreviewValueChanged"/>
+                            <TextBlock x:Name="LblDim" Style="{StaticResource Label}" Width="44"
+                                       Margin="10,0,0,0" VerticalAlignment="Center"/>
+                            <ContentControl x:Name="HostDimColor" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Handles"/>
+                            <ContentControl x:Name="HostHandleColor" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <WrapPanel Margin="0,4,0,0">
+                            <CheckBox x:Name="ChkCrosshair" Content="Crosshair guides" Margin="0,0,20,8" Click="OnPreviewToggle"/>
+                            <CheckBox x:Name="ChkMagnifier" Content="Pixel magnifier" Margin="0,0,20,8" Click="OnPreviewToggle"/>
+                            <CheckBox x:Name="ChkDimensions" Content="Size readout" Margin="0,0,20,8" Click="OnPreviewToggle"/>
+                            <CheckBox x:Name="ChkThirds" Content="Rule of thirds" Margin="0,0,20,8" Click="OnPreviewToggle"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== capture behaviour ===== -->
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Heading}" Text="Capture"/>
+                        <TextBlock Style="{StaticResource Label}" Margin="0,3,0,12" TextWrapping="Wrap"
+                                   Text="Every capture is taken from the desktop at full device resolution and then cropped, so a small selection keeps every real pixel instead of being scaled up."/>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Default mode"/>
+                            <ComboBox x:Name="CmbDefaultMode" Width="150"/>
+                            <TextBlock Style="{StaticResource Label}" Text="Delay" VerticalAlignment="Center" Margin="20,0,8,0"/>
+                            <ComboBox x:Name="CmbDelay" Width="120"/>
+                        </StackPanel>
+
+                        <WrapPanel Margin="0,0,0,10">
+                            <CheckBox x:Name="ChkCursor" Content="Include the mouse cursor" Margin="0,0,20,8"/>
+                            <CheckBox x:Name="ChkClipboard" Content="Copy to clipboard" Margin="0,0,20,8"/>
+                            <CheckBox x:Name="ChkAutoSave" Content="Save automatically" Margin="0,0,20,8"/>
+                            <CheckBox x:Name="ChkOpenEditor" Content="Open the editor" Margin="0,0,20,8"/>
+                        </WrapPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Save captures to"/>
+                            <TextBox x:Name="TxtSaveFolder" Width="340" VerticalAlignment="Center"/>
+                            <Button Content="Browse…" Margin="8,0,0,0" Click="OnBrowseSaveFolder"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="File name"/>
+                            <TextBox x:Name="TxtFileName" Width="240" VerticalAlignment="Center"/>
+                            <TextBlock Style="{StaticResource Label}" VerticalAlignment="Center" Margin="10,0,0,0"
+                                       Text="{}{date} {time} {datetime} {unix}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== editor ===== -->
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Heading}" Text="Annotation defaults"/>
+                        <TextBlock Style="{StaticResource Label}" Margin="0,3,0,12" TextWrapping="Wrap"
+                                   Text="Text boxes are always Arial. Only the size changes, which is one decision fewer every time you annotate."/>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Ink colour"/>
+                            <ContentControl x:Name="HostInkColor" VerticalAlignment="Center"/>
+                            <TextBlock Style="{StaticResource Label}" Text="Thickness" VerticalAlignment="Center" Margin="20,0,8,0"/>
+                            <Slider x:Name="SldInkThickness" Width="140" Minimum="1" Maximum="20" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Font size"/>
+                            <Slider x:Name="SldFontSize" Width="200" Minimum="8" Maximum="96" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="LblFontSize" Style="{StaticResource Label}" Width="34" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Sandbox colour"/>
+                            <ContentControl x:Name="HostBoardColor" VerticalAlignment="Center"/>
+                            <CheckBox x:Name="ChkGrid" Content="Show grid" Margin="20,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Export scale"/>
+                            <ComboBox x:Name="CmbExportScale" Width="120"/>
+                            <TextBlock Style="{StaticResource Label}" VerticalAlignment="Center" Margin="12,0,0,0" TextWrapping="Wrap" Width="330"
+                                       Text="Drawings and text are vectors, so 2x or 3x sharpens them rather than enlarging a blur."/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== recording ===== -->
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Heading}" Text="Recording"/>
+                        <TextBlock Style="{StaticResource Label}" Margin="0,3,0,12" TextWrapping="Wrap"
+                                   Text="Audio sources can be changed while the recording is running. The control bar is hidden from the recording itself."/>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Frame rate"/>
+                            <ComboBox x:Name="CmbFps" Width="110"/>
+                            <TextBlock Style="{StaticResource Label}" Text="Quality" VerticalAlignment="Center" Margin="20,0,8,0"/>
+                            <Slider x:Name="SldQuality" Width="150" Minimum="14" Maximum="30" IsDirectionReversed="True"
+                                    VerticalAlignment="Center" ValueChanged="OnQualityChanged"/>
+                            <TextBlock x:Name="LblQuality" Style="{StaticResource Label}" Width="86" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Encoder"/>
+                            <ComboBox x:Name="CmbEncoder" Width="200"/>
+                            <CheckBox x:Name="ChkRecordCursor" Content="Record the cursor" Margin="20,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Save videos to"/>
+                            <TextBox x:Name="TxtRecordFolder" Width="340" VerticalAlignment="Center"/>
+                            <Button Content="Browse…" Margin="8,0,0,0" Click="OnBrowseRecordFolder"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="ffmpeg"/>
+                            <TextBox x:Name="TxtFfmpeg" Width="340" VerticalAlignment="Center"/>
+                            <Button Content="Find" Margin="8,0,0,0" Click="OnFindFfmpeg"/>
+                        </StackPanel>
+                        <TextBlock x:Name="LblFfmpegState" Style="{StaticResource Label}" Margin="126,0,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ===== shortcuts ===== -->
+                <Border Style="{StaticResource Section}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Heading}" Text="Shortcuts"/>
+                        <TextBlock Style="{StaticResource Label}" Margin="0,3,0,12" TextWrapping="Wrap"
+                                   Text="Work anywhere in Windows while KAM Capture Tool is running. Click a box and press the combination."/>
+
+                        <CheckBox x:Name="ChkHotkeys" Content="Enable global shortcuts" Margin="0,0,0,12"/>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Region"/>
+                            <ContentControl x:Name="HostHkRegion" Width="170"/>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Window" Margin="20,0,0,0"/>
+                            <ContentControl x:Name="HostHkWindow" Width="170"/>
+                        </StackPanel>
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Full screen"/>
+                            <ContentControl x:Name="HostHkFull" Width="170"/>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Record" Margin="20,0,0,0"/>
+                            <ContentControl x:Name="HostHkRecord" Width="170"/>
+                        </StackPanel>
+
+                        <CheckBox x:Name="ChkStartup" Content="Start with Windows" Margin="0,8,0,8"/>
+                        <CheckBox x:Name="ChkTray" Content="Start hidden in the notification area"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="1" Background="{StaticResource Panel}" BorderBrush="{StaticResource Edge}" BorderThickness="0,1,0,0">
+            <DockPanel LastChildFill="False" Margin="18,10">
+                <Button Content="Restore defaults" Click="OnRestoreDefaults"/>
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Save"
+                        MinWidth="94" Click="OnSaveSettings"/>
+                <Button DockPanel.Dock="Right" Content="Cancel" Margin="0,0,8,0" MinWidth="80" Click="OnCancel"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

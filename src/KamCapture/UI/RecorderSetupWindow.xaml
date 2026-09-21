@@ -1,0 +1,103 @@
+<Window x:Class="KamCapture.UI.RecorderSetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="KAM Capture Tool — Record" Height="580" Width="620"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        Background="{StaticResource Navy}" UseLayoutRounding="True">
+
+    <Window.Resources>
+        <Style x:Key="Section" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Panel}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Edge}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,14"/>
+        </Style>
+        <Style x:Key="TargetToggle" TargetType="ToggleButton" BasedOn="{StaticResource ToolToggle}">
+            <Setter Property="Width" Value="132"/>
+            <Setter Property="Height" Value="62"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20,18,20,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0">
+            <Border Style="{StaticResource Section}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Heading}" Text="What to record"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                        <ToggleButton x:Name="TgtMonitor" Style="{StaticResource TargetToggle}" Tag="Monitor" Click="OnTargetClick">
+                            <StackPanel>
+                                <TextBlock Text="This display" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="LblMonitor" Style="{StaticResource Label}" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton x:Name="TgtAll" Style="{StaticResource TargetToggle}" Tag="FullScreen" Click="OnTargetClick">
+                            <StackPanel>
+                                <TextBlock Text="All displays" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="LblAll" Style="{StaticResource Label}" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton x:Name="TgtWindow" Style="{StaticResource TargetToggle}" Tag="Window" Click="OnTargetClick">
+                            <StackPanel>
+                                <TextBlock Text="An application" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBlock Style="{StaticResource Label}" Text="pick below" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </ToggleButton>
+                        <ToggleButton x:Name="TgtRegion" Style="{StaticResource TargetToggle}" Tag="Region" Click="OnTargetClick">
+                            <StackPanel>
+                                <TextBlock Text="A region" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBlock Style="{StaticResource Label}" Text="drag it next" HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </ToggleButton>
+                    </StackPanel>
+
+                    <StackPanel x:Name="PanelWindow" Orientation="Horizontal" Margin="0,14,0,0">
+                        <ComboBox x:Name="CmbWindow" Width="432"/>
+                        <Button Content="Refresh" Margin="8,0,0,0" Click="OnRefreshWindows"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Section}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Heading}" Text="Audio"/>
+                    <TextBlock Style="{StaticResource Label}" Margin="0,3,0,12" TextWrapping="Wrap"
+                               Text="Set it here, or change any of it while the recording is running — the control bar carries the same switches."/>
+
+                    <CheckBox x:Name="ChkSystem" Content="System audio — whatever the computer is playing" Margin="0,0,0,10"/>
+
+                    <CheckBox x:Name="ChkMic" Content="Microphone" Margin="0,0,0,8" Click="OnMicToggled"/>
+                    <StackPanel Orientation="Horizontal" Margin="24,0,0,0">
+                        <ComboBox x:Name="CmbMic" Width="400"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource Section}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Heading}" Text="Quality"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <TextBlock x:Name="LblQuality" Style="{StaticResource Label}" VerticalAlignment="Center"/>
+                        <Button Content="Change…" Margin="14,0,0,0" Click="OnOpenSettings"/>
+                    </StackPanel>
+                    <TextBlock x:Name="LblFfmpeg" Style="{StaticResource Label}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <DockPanel Grid.Row="1" LastChildFill="False" Margin="0,4,0,14">
+            <TextBlock Style="{StaticResource Label}" VerticalAlignment="Center"
+                       Text="The control bar never appears in the recording."/>
+            <Button DockPanel.Dock="Right" x:Name="BtnStart" Style="{StaticResource PrimaryButton}"
+                    Content="Start recording" MinWidth="140" Click="OnStart"/>
+            <Button DockPanel.Dock="Right" Content="Cancel" Margin="0,0,8,0" MinWidth="88" Click="OnCancel"/>
+        </DockPanel>
+    </Grid>
+</Window>

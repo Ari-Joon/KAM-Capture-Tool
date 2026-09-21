@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="kamCaptureTitle">
+  <title id="kamCaptureTitle">KAM Capture Tool</title>
+  <circle cx="128" cy="128" r="128" fill="#0A0D14"/>
+  <g fill="none" stroke="#4A7CFF" stroke-width="17" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M58 96 L58 58 L96 58"/>
+    <path d="M160 58 L198 58 L198 96"/>
+    <path d="M58 160 L58 198 L96 198"/>
+    <path d="M198 160 L198 198 L160 198"/>
+  </g>
+  <g transform="translate(128 128) rotate(135)">
+    <rect x="-54" y="-15" width="76" height="30" fill="#3A63D8"/>
+    <rect x="22" y="-15" width="7" height="30" fill="#9CBEFF"/>
+    <path d="M29 -15 L29 15 L58 0 Z" fill="#9CBEFF"/>
+    <path d="M49 -4.7 L49 4.7 L58 0 Z" fill="#0A0D14"/>
+  </g>
+</svg>
