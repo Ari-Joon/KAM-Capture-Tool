@@ -61,10 +61,16 @@ executable, or wherever you point it in Settings.
 |---|---|
 | `%APPDATA%\KAM Capture Tool\settings.json` | Every setting |
 | `%APPDATA%\KAM Capture Tool\kam-capture.log` | A short rolling log, trimmed at 512 KB |
-| `Pictures\KAM Captures` | Saved captures, by default |
-| `Videos\KAM Recordings` | Saved recordings, by default |
+| `Pictures\KAM Capture Tool\Screenshots` | Saved captures, by default |
+| `Videos\KAM Capture Tool\Recordings` | Saved recordings, by default |
 
 Nothing is written anywhere else, and nothing is sent anywhere.
+
+Captures are kept on local disk on purpose. Windows' known-folder move often
+repoints Pictures into OneDrive, which would upload every screenshot you take;
+KAM steps around a redirected folder and uses the real one in your profile. If
+you would rather they synced, point it at a OneDrive folder in Settings and it
+will ask you to confirm.
 
 ## Global shortcuts
 
