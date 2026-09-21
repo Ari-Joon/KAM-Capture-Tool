@@ -161,7 +161,10 @@ namespace KamCapture.Recording
             (_paused ? DateTime.UtcNow - _pauseStarted : TimeSpan.Zero);
 
         public long FramesWritten { get; private set; }
-        public long FramesDropped { get; private set; }
+
+        /// <summary>A second of catch-up is plenty; beyond that, accept the gap.</summary>
+        private const int MaxCatchUpFrames = 30;
+        public long FramesDuplicated { get; private set; }
         public float AudioPeak => _audio?.LastPeak ?? 0;
 
         public event Action<string>? Failed;
@@ -265,10 +268,22 @@ namespace KamCapture.Recording
             var sb = new StringBuilder();
 
             sb.Append("-hide_banner -loglevel warning -y ");
+
+            // Both inputs are raw with every parameter already stated, so there
+            // is nothing to probe. Left to its defaults ffmpeg sits reading the
+            // audio pipe looking for a stream description, and while it does
+            // that it is not draining the video pipe — which fills, blocks the
+            // frame pump, and yields a handful of frames for a whole take.
+            const string rawInput = "-thread_queue_size 4096 -analyzeduration 0 -probesize 32 ";
+
+            sb.Append(rawInput);
             sb.Append($"-f rawvideo -pixel_format bgra -video_size {w}x{h} -framerate {_cfg.RecordFps} -i - ");
 
             if (pipeName != null)
+            {
+                sb.Append(rawInput);
                 sb.Append($"-f s16le -ar {AudioEngine.SampleRate} -ac {AudioEngine.Channels} -i \\\\.\\pipe\\{pipeName} ");
+            }
 
             sb.Append($"-c:v {encoder} ");
             sb.Append(encoder == "libx264"
@@ -304,23 +319,11 @@ namespace KamCapture.Recording
 
                 while (_running)
                 {
-                    double due = frame * interval;
-                    double now = clock.Elapsed.TotalMilliseconds;
-
-                    if (now < due)
+                    long target = (long)(clock.Elapsed.TotalMilliseconds / interval);
+                    if (target <= frame)
                     {
-                        int sleep = (int)(due - now);
-                        Thread.Sleep(sleep > 1 ? sleep - 1 : 0);
+                        Thread.Sleep(1);
                         continue;
-                    }
-
-                    // Falling far behind means the machine cannot keep up; skip
-                    // ahead rather than accumulating an ever-growing debt.
-                    if (now - due > interval * 4)
-                    {
-                        long skip = (long)((now - due) / interval);
-                        frame += skip;
-                        FramesDropped += skip;
                     }
 
                     int sx = Target.X, sy = Target.Y;
@@ -328,25 +331,28 @@ namespace KamCapture.Recording
                     // A window target follows the window as it is moved.
                     if (Target.Kind == RecordKind.Window && Target.Window != IntPtr.Zero)
                     {
-                        var (wx, wy, _, _) = WindowFinder.GetWindowBounds(Target.Window);
-                        if (wx != 0 || wy != 0) { sx = wx; sy = wy; }
+                        var (wx, wy, ww, wh) = WindowFinder.GetWindowBounds(Target.Window);
+                        if (ww > 0 && wh > 0) { sx = wx; sy = wy; }
                     }
 
                     if (!_paused)
-                    {
                         grabber.Grab(sx, sy, _cfg.RecordCursor);
-                        try { grabber.WriteTo(stdin); }
-                        catch { break; }
-                        FramesWritten++;
-                    }
-                    else
+
+                    // The encoder is fed a constant frame rate, so every tick of
+                    // wall time owes it a frame. When capture cannot keep up the
+                    // last frame is repeated rather than skipped: dropping them
+                    // here would shorten the file and play the recording back
+                    // faster than it actually happened.
+                    long owed = Math.Min(target - frame, MaxCatchUpFrames);
+                    for (long i = 0; i < owed; i++)
                     {
-                        // While paused keep emitting the last frame so the
-                        // timeline stays continuous for the encoder.
-                        try { grabber.WriteTo(stdin); } catch { break; }
+                        try { grabber.WriteTo(stdin); }
+                        catch { _running = false; break; }
                     }
 
-                    frame++;
+                    FramesWritten += owed;
+                    FramesDuplicated += owed - 1;
+                    frame = target;
                 }
 
                 try { stdin.Flush(); } catch { }

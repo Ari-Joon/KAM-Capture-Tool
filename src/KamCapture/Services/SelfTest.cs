@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -69,6 +70,67 @@ namespace KamCapture.Services
             {
                 return Fail(ex.ToString());
             }
+        }
+
+        /// <summary>
+        /// Record a small region for a few seconds with no interface at all, to
+        /// prove the frame pump, the audio mixer and the ffmpeg pipeline
+        /// actually produce a playable file.
+        /// </summary>
+        public static int RecordTest(string outputPath, int seconds)
+        {
+            try
+            {
+                var ffmpeg = Recording.FfmpegLocator.Resolve(null);
+                if (ffmpeg == null) return Fail("ffmpeg not found");
+
+                var cfg = Settings.AppSettings.Load();
+                cfg.RecordFolder = Path.GetDirectoryName(Path.GetFullPath(outputPath))!;
+                cfg.FileNameTemplate = Path.GetFileNameWithoutExtension(outputPath);
+                cfg.RecordFps = 30;
+                cfg.RecordCursor = false;
+
+                var target = Recording.RecordTarget.Region(new Int32Rect(0, 0, 640, 360));
+                using var recorder = new Recording.ScreenRecorder(cfg, target, ffmpeg);
+
+                string? failure = null;
+                recorder.Failed += m => failure ??= m;
+
+                Say($"recording {seconds}s of 640x360 to {recorder.OutputPath}");
+                recorder.Start(systemAudio: true, micDeviceId: null);
+                Say("  started");
+
+                var end = DateTime.UtcNow.AddSeconds(seconds);
+                while (DateTime.UtcNow < end) System.Threading.Thread.Sleep(100);
+
+                Say("  stopping");
+                string? path = null;
+                var stopped = Task.Run(() => path = recorder.Stop());
+                if (!stopped.Wait(TimeSpan.FromSeconds(30)))
+                    return Fail("Stop() did not return within 30s");
+                Say("  stopped");
+                Say($"  frames written: {recorder.FramesWritten}, padded: {recorder.FramesDuplicated}");
+                if (failure != null) Say("  reported: " + failure);
+
+                if (path == null || !File.Exists(path)) return Fail("no output file");
+                var bytes = new FileInfo(path).Length;
+                Say($"  file: {path} ({bytes / 1024.0:0} KB)");
+                if (bytes < 4096) return Fail("output file is suspiciously small");
+
+                double expected = seconds * 30 * 0.6;
+                if (recorder.FramesWritten < expected)
+                    return Fail($"only {recorder.FramesWritten} frames in {seconds}s");
+
+                Say("record-test OK");
+                return 0;
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+        }
+
+        private static void Say(string message)
+        {
+            Console.WriteLine(message);
+            Console.Out.Flush();
         }
 
         private static int Fail(string message)

@@ -154,6 +154,17 @@ stops. That is what makes it safe to switch microphone, mute the system audio, o
 add a source you forgot, in the middle of a take: the output stream is unbroken,
 so nothing drifts out of sync and nothing has to be re-recorded.
 
+A five-second 640 × 360 take with system audio comes out as exactly 150 frames:
+5.000 s of H.264 alongside 4.98 s of 48 kHz stereo AAC. Two things were needed to
+get there. Both raw inputs are given `-thread_queue_size 4096 -analyzeduration 0
+-probesize 32`, because with its defaults ffmpeg sits probing the audio pipe for
+a stream description it has already been told, stops draining the video pipe
+while it does, and the same five-second take arrives with **22 frames** in it.
+And when capture cannot keep up, the frame pump repeats the last frame rather
+than skipping: the encoder is being fed a constant frame rate, so a skipped frame
+does not cost detail, it shortens the file and plays the recording back faster
+than it happened.
+
 The control bar carries the same switches as the setup screen, and sets
 `WDA_EXCLUDEFROMCAPTURE` on itself, so it is invisible to every capture API on
 the machine — including this recorder. It cannot film itself.

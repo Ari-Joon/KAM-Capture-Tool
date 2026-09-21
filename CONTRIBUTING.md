@@ -33,7 +33,19 @@ moves and scales the group, checks the scale factor came out right, exports at
 runs in CI. Exit code 0 means the drawing, grouping, transform and export paths
 are intact.
 
-Screen capture, the selection overlay and recording are not covered. They need a
+Recording has its own headless check, which needs ffmpeg and a sound card and so
+does not run in CI:
+
+```powershell
+dotnet run --project src/KamCapture -- --rectest=out.mp4,5
+```
+
+It records a 640 x 360 region for five seconds with system audio, no interface at
+all, and fails if the frame count is short of the wall clock. A correct run
+writes exactly `fps x seconds` frames. Check the result with ffprobe: the video
+duration should match the seconds you asked for, not be shorter.
+
+Screen capture and the selection overlay are not covered. They need a
 desktop, a pointer and in one case a sound card. If you change them, say in the
 pull request what you did by hand to check them.
 

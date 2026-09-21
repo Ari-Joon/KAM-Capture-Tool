@@ -65,6 +65,16 @@ namespace KamCapture
                 return;
             }
 
+            var recTest = e.Args.FirstOrDefault(a => a.StartsWith("--rectest=", StringComparison.OrdinalIgnoreCase));
+            if (recTest != null)
+            {
+                var spec = recTest["--rectest=".Length..].Split(',');
+                int secs = spec.Length > 1 && int.TryParse(spec[1], out var n) ? n : 4;
+                Environment.ExitCode = SelfTest.RecordTest(spec[0], secs);
+                Shutdown();
+                return;
+            }
+
             var docShots = e.Args.FirstOrDefault(a => a.StartsWith("--docshots", StringComparison.OrdinalIgnoreCase));
             if (docShots != null)
             {

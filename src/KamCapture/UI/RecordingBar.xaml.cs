@@ -109,7 +109,7 @@ namespace KamCapture.UI
                 : peak > 0.7 ? Color.FromRgb(0xFF, 0xD4, 0x00) : Color.FromRgb(0x2B, 0xB6, 0x73));
 
             LblStats.Text = $"{_recorder.FramesWritten} frames" +
-                (_recorder.FramesDropped > 0 ? $"  ·  {_recorder.FramesDropped} dropped" : "");
+                (_recorder.FramesDuplicated > 0 ? $"  ·  {_recorder.FramesDuplicated} padded" : "");
 
             DotRec.Fill = new SolidColorBrush(_recorder.IsPaused
                 ? Color.FromRgb(0xFF, 0xD4, 0x00)
