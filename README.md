@@ -305,7 +305,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.0. Everything described above is implemented and works.
+Version 1.1. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
