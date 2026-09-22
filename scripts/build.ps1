@@ -44,9 +44,10 @@ if ($DocShots) {
 
 Step 'Publish'
 if (Test-Path $dist) { Remove-Item $dist -Recurse -Force }
+# Not compressed, on purpose: compression doubles idle memory. See the README.
 dotnet publish $proj -c Release -r win-x64 --self-contained true `
     -p:PublishSingleFile=true `
-    -p:EnableCompressionInSingleFile=true `
+    -p:EnableCompressionInSingleFile=false `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -o $dist --nologo -v minimal
 if ($LASTEXITCODE -ne 0) { throw 'publish failed' }

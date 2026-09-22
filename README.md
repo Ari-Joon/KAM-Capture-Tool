@@ -252,6 +252,21 @@ who wants to show you a bug in it.
 Everything is one self-contained executable. No runtime to install, no second
 payload, no service, no driver, no elevation.
 
+It is not compressed, which is why it is 170 MB. Compressed, it downloads at
+72 MB — but then every library inside it is unpacked into memory as it loads
+and stays there for as long as it runs, and this is a program that sits in the
+tray all day:
+
+| Packaging | Download | Start-up | Idle memory | Of which private |
+|---|---|---|---|---|
+| Compressed — up to 1.1.1 | 71.5 MB | 0.38 s | 261 MB | 161 MB |
+| Uncompressed — from 1.1.2 | 170 MB | 0.50 s | **135 MB** | **87 MB** |
+
+It starts a tenth of a second slower, and uses half the memory for as long as
+it runs. Measured six seconds after start with nothing open, median of three
+runs. Precompiling it as well (ReadyToRun) made start-up slower and memory
+worse, because the .NET and WPF libraries it carries are precompiled already.
+
 ## Install
 
 Download `KamCapture.exe` from
@@ -309,7 +324,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.1.1. Everything described above is implemented and works.
+Version 1.1.2. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
