@@ -23,9 +23,27 @@ namespace KamCapture.Services
             try
             {
                 Directory.CreateDirectory(outputDir);
-                var cfg = AppSettings.Load();
+
+                // The defaults, not the settings of whoever runs this: no chosen
+                // colours, and no real user folders in a public README.
+                var cfg = new AppSettings
+                {
+                    SaveFolder = Path.Combine(ExampleProfile, "Pictures", OutputFolder.CapturesLeaf),
+                    RecordFolder = Path.Combine(ExampleProfile, "Videos", OutputFolder.RecordingsLeaf)
+                };
 
                 Shoot(new MainWindow(cfg), 568, 364, Path.Combine(outputDir, "home.png"));
+
+                // The same window with an update waiting, one version on from this one.
+                var now = Setup.Updater.Current;
+                var next = new Version(now.Major, now.Minor, now.Build + 1);
+                var waiting = new MainWindow(cfg);
+                waiting.PrepareForDocShot(new Setup.Updater.Release(next,
+                    $"KAM Capture Tool {next.ToString(3)} - what changed, in a few words",
+                    Setup.Updater.ReleasesPage, "https://example.invalid/KamCapture.exe", null, null, 0));
+                waiting.UpdateBar.Measure(new Size(568, double.PositiveInfinity));
+                Shoot(waiting, 568, 364 + Math.Ceiling(waiting.UpdateBar.DesiredSize.Height),
+                    Path.Combine(outputDir, "update.png"));
                 Shoot(new SettingsWindow(cfg), 660, 700, Path.Combine(outputDir, "settings.png"));
                 Shoot(new RecorderSetupWindow(cfg), 620, 580, Path.Combine(outputDir, "record-setup.png"));
 
@@ -43,6 +61,32 @@ namespace KamCapture.Services
             }
         }
 
+        private const string ExampleProfile = @"C:\Users\you";
+
+        /// <summary>
+        /// Some text is read from the machine rather than from settings — where
+        /// ffmpeg was found, for one — so swap the real profile folder out of
+        /// anything shown before the picture is taken.
+        /// </summary>
+        private static void Scrub(DependencyObject node)
+        {
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (string.IsNullOrEmpty(profile)) return;
+
+            switch (node)
+            {
+                case TextBlock t when t.Text.Contains(profile, StringComparison.OrdinalIgnoreCase):
+                    t.Text = t.Text.Replace(profile, ExampleProfile, StringComparison.OrdinalIgnoreCase);
+                    break;
+                case TextBox b when b.Text.Contains(profile, StringComparison.OrdinalIgnoreCase):
+                    b.Text = b.Text.Replace(profile, ExampleProfile, StringComparison.OrdinalIgnoreCase);
+                    break;
+            }
+
+            foreach (var child in LogicalTreeHelper.GetChildren(node))
+                if (child is DependencyObject d) Scrub(d);
+        }
+
         private static void Shoot(Window window, double width, double height, string path, double scale = 2.0)
         {
             window.Width = width;
@@ -50,6 +94,8 @@ namespace KamCapture.Services
 
             if (window.Content is not FrameworkElement root)
                 throw new InvalidOperationException("window has no content: " + window.GetType().Name);
+
+            Scrub(root);
 
             // Arranging the root directly would swallow its margin, because a
             // margin is applied by the parent. Re-host it in a border of the

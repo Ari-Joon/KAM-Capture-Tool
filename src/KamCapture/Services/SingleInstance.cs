@@ -14,8 +14,10 @@ namespace KamCapture.Services
     /// </summary>
     public static class SingleInstance
     {
-        private const string PipeName = "KAM.CaptureTool.Instance";
-        private const string MutexName = @"Local\KAM.CaptureTool.SingleInstance";
+        // A sandboxed copy (the update check) gets names of its own, so it
+        // never meets a real copy running on the same desktop.
+        private static readonly string PipeName = "KAM.CaptureTool.Instance" + Sandbox.Suffix;
+        private static readonly string MutexName = @"Local\KAM.CaptureTool.SingleInstance" + Sandbox.Suffix;
         private static Mutex? _mutex;
 
         public static bool IsFirst { get; private set; }

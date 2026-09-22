@@ -31,6 +31,15 @@ jobs:
           $size = (Get-Item selftest.png).Length
           Write-Host "self-test image: $([math]::Round($size/1kb,1)) KB"
 
+      # Both run the real code against scratch folders and a scratch registry
+      # key, and need no display. The update check makes no network request.
+      - name: Install and update checks
+        run: |
+          dotnet run --project src/KamCapture -c Release --no-build -- --installtest
+          if ($LASTEXITCODE -ne 0) { throw 'install check failed' }
+          dotnet run --project src/KamCapture -c Release --no-build -- --updatetest
+          if ($LASTEXITCODE -ne 0) { throw 'update check failed' }
+
       # Not compressed, on purpose: compressed, the runtime unpacks every
       # library into memory and keeps it there, which doubled idle memory
       # for a program that sits in the tray all day. See the README.

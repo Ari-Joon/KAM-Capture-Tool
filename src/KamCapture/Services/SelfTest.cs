@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -244,10 +247,7 @@ namespace KamCapture.Services
 
             try
             {
-                Setup.Installer.Where = new Setup.Installer.Footprint(
-                    regRoot + @"\App", regRoot + @"\Uninstall", regRoot + @"\Run",
-                    Path.Combine(root, "Default", Setup.Installer.ProductName),
-                    Path.Combine(root, "Desktop"), Path.Combine(root, "Start Menu"));
+                Setup.Installer.Where = Setup.Installer.Footprint.In(root, regRoot);
 
                 var chosen = Path.Combine(root, "Chosen", Setup.Installer.ProductName);
                 string StartsAt() => Settings.StartupRegistration.Registered() ?? "nothing";
@@ -296,6 +296,144 @@ namespace KamCapture.Services
             if (failures > 0) return Fail(failures + " expectation(s) not met");
             Say("install-test OK");
             return 0;
+        }
+
+        /// <summary>
+        /// The update path short of the network and the restart: versions are
+        /// compared number by number, GitHub's reply is read correctly, a
+        /// download that does not match its checksum is thrown away without a
+        /// trace, a failed swap puts the old program back, and a download
+        /// opened over a running copy is offered as an update instead of being
+        /// handed over to it. The restart is scripts/test-update.ps1.
+        /// </summary>
+        public static int UpdateTest()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "kam-updatetest-" + Guid.NewGuid().ToString("N")[..8]);
+            var failures = 0;
+            void Expect(bool ok, string what)
+            {
+                Say((ok ? "  ok    " : "  FAIL  ") + what);
+                if (!ok) failures++;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(root);
+
+                Say("versions");
+                static Version? V(string s) => Setup.Updater.ParseVersion(s);
+                Expect(V("v1.2.0") == new Version(1, 2, 0), "v1.2.0 reads as 1.2.0");
+                Expect(V("1.10.0") > V("1.9.9"), "1.10.0 is newer than 1.9.9, not older");
+                Expect(V("v2") == new Version(2, 0, 0), "v2 reads as 2.0.0");
+                Expect(V("1.2.0-beta") == null && V("latest") == null && V("") == null,
+                    "anything else is not a version");
+
+                Say("GitHub's reply");
+                var release = Setup.Updater.Parse(SampleRelease);
+                Expect(release?.Version == new Version(1, 1, 2), "the version comes from the tag");
+                Expect(release?.Download?.EndsWith("/v1.1.2/KamCapture.exe") == true,
+                    "the download is the executable, not the checksum file");
+                Expect(release?.Sha256 == "b98e5f950552f91be336946bb677bb737b5c9424d19ffd7a736fd49a1d91bccc",
+                    "the checksum comes from GitHub's digest of the asset");
+                Expect(release?.Summary == "half the memory", "the summary is the title without the name and number");
+                Expect(Setup.Updater.Parse(SampleRelease.Replace("\"prerelease\": false", "\"prerelease\": true")) == null,
+                    "a pre-release is not offered");
+                Expect(Setup.Updater.Parse(SampleRelease.Replace("\"KamCapture.exe\"", "\"Other.exe\""))?.Download == null,
+                    "a release without the executable has nothing to install");
+
+                Say("download");
+                var payload = Encoding.UTF8.GetBytes("stand-in for an executable");
+                var good = Convert.ToHexString(SHA256.HashData(payload));
+                var target = Path.Combine(root, "Updates", "KamCapture-9.9.9.exe");
+
+                Run(() => Setup.Updater.SaveVerifiedAsync(new MemoryStream(payload), payload.Length, good,
+                    target, null, CancellationToken.None));
+                Expect(File.Exists(target) && File.ReadAllBytes(target).SequenceEqual(payload),
+                    "a download that matches its checksum is kept");
+
+                File.Delete(target);
+                Expect(Throws<Setup.UpdateException>(() => Setup.Updater.SaveVerifiedAsync(new MemoryStream(payload),
+                        payload.Length, new string('0', 64), target, null, CancellationToken.None)),
+                    "a download that does not match is refused");
+                Expect(!File.Exists(target) && !File.Exists(target + ".partial"), "…and nothing of it is left on disk");
+
+                Expect(Throws<Setup.UpdateException>(() => Setup.Updater.SaveVerifiedAsync(new MemoryStream(payload),
+                        payload.Length, null, target, null, CancellationToken.None)) && !File.Exists(target),
+                    "a download with no published checksum is refused");
+
+                Say("swapping the program");
+                var installed = Path.Combine(root, "Programs", "KamCapture.exe");
+                Directory.CreateDirectory(Path.GetDirectoryName(installed)!);
+                File.WriteAllText(installed, "old version");
+                Expect(Throws<Exception>(() =>
+                    {
+                        Setup.Installer.ReplaceExe(Path.Combine(root, "missing.exe"), installed);
+                        return Task.CompletedTask;
+                    }), "a swap from a file that is not there fails");
+                Expect(File.Exists(installed) && File.ReadAllText(installed) == "old version",
+                    "…and the old program is back in its place");
+
+                var fresh = Path.Combine(root, "new.exe");
+                File.WriteAllText(fresh, "new version");
+                Setup.Installer.ReplaceExe(fresh, installed);
+                Expect(File.ReadAllText(installed) == "new version", "a good swap puts the new program in place");
+
+                Say("a download opened while a copy is running");
+                var home = Path.GetDirectoryName(installed)!;
+                var downloads = Path.Combine(root, "Downloads");
+                var plain = Array.Empty<string>();
+                Expect(App.ShouldOfferUpdate(true, home, downloads, plain), "it is offered as an update");
+                Expect(!App.ShouldOfferUpdate(true, home, home, plain), "the installed copy opened again is handed over");
+                Expect(!App.ShouldOfferUpdate(true, home, downloads, new[] { "--capture=Region" }),
+                    "a command is still handed over");
+                Expect(!App.ShouldOfferUpdate(false, home, downloads, plain), "with nothing running it starts as usual");
+                Expect(!App.ShouldOfferUpdate(true, null, downloads, plain), "with nothing installed it is handed over");
+            }
+            catch (Exception ex) { Expect(false, ex.ToString()); }
+            finally
+            {
+                try { Directory.Delete(root, recursive: true); } catch { }
+            }
+
+            if (failures > 0) return Fail(failures + " expectation(s) not met");
+            Say("update-test OK");
+            return 0;
+        }
+
+        /// <summary>GitHub's reply for 1.1.2, trimmed to the fields the updater reads.</summary>
+        private const string SampleRelease = """
+            {
+              "html_url": "https://github.com/Ari-Joon/KAM-Capture-Tool/releases/tag/v1.1.2",
+              "tag_name": "v1.1.2",
+              "name": "KAM Capture Tool 1.1.2 - half the memory",
+              "draft": false,
+              "prerelease": false,
+              "assets": [
+                {
+                  "name": "KamCapture.exe",
+                  "size": 178351621,
+                  "digest": "sha256:b98e5f950552f91be336946bb677bb737b5c9424d19ffd7a736fd49a1d91bccc",
+                  "browser_download_url": "https://github.com/Ari-Joon/KAM-Capture-Tool/releases/download/v1.1.2/KamCapture.exe"
+                },
+                {
+                  "name": "SHA256SUMS.txt",
+                  "size": 82,
+                  "digest": "sha256:370a51da98416bb7cd67a5229bb9022399343b9a5288ee819e21107fae1eedf4",
+                  "browser_download_url": "https://github.com/Ari-Joon/KAM-Capture-Tool/releases/download/v1.1.2/SHA256SUMS.txt"
+                }
+              ]
+            }
+            """;
+
+        // Async work run from the UI thread, off it: awaiting on the dispatcher
+        // while blocking it for the result would deadlock.
+        private static void Run(Func<Task> work) => Task.Run(work).GetAwaiter().GetResult();
+
+        private static bool Throws<T>(Func<Task> work) where T : Exception
+        {
+            try { Run(work); return false; }
+            catch (T) { return true; }
+            catch { return false; }
         }
 
         /// <summary>A fingerprint of an install, to prove a check left it alone.</summary>
@@ -374,6 +512,14 @@ namespace KamCapture.Services
                 a?.Close();
                 Pump(300);
                 Expect(home.IsVisible, "closing the last annotator brings home back");
+
+                Say("close the home window, then open it from the tray");
+                home.Close();
+                Pump(200);
+                Expect(!home.IsVisible, "closing puts it away");
+                home.Show();
+                Pump(200);
+                Expect(home.IsVisible, "it opens again, rather than being gone for good");
             }
             catch (Exception ex) { return Fail(ex.ToString()); }
             finally

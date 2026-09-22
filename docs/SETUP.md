@@ -24,6 +24,8 @@ signed. *More info* then *Run anyway*.
 | `--tray` | Start hidden in the notification area |
 | `--portable` | Skip the install prompt for this run |
 | `--capture=Region` | Take a capture immediately (`Region`, `Window`, `Monitor`, `FullScreen`) |
+| `--update` | Check GitHub and, if there is a newer version, install it and restart |
+| `--apply-update` | Used by the updater: install this copy over the running one, then start it |
 | `--install-silent` | Install with no interface. Over an existing install it updates it in place, keeping its folder, the shortcuts still there, and start-with-Windows; otherwise the default folder with both shortcuts |
 | `--uninstall` | Remove shortcuts, registry entries and the install folder |
 | `--uninstall --quiet` | The same without the confirmation |
@@ -34,11 +36,12 @@ signed. *More info* then *Run anyway*.
 | `--ghosttest` | Measure how much of a hidden window leaks into a grab; flashes a window |
 | `--savetest` | Walk the Save path end to end and report where it breaks |
 | `--installtest` | Check install and update against a scratch registry key and folders; touches nothing real |
+| `--updatetest` | Check version comparison, reading a release, checksum refusal and the program swap; no network |
 | `--rectest=<file>,<seconds>` | Record a small region headlessly and check the frame count |
 | `--docshots=<dir>` | Render the windows to PNGs offscreen, for documentation |
 
 The checks run alongside a copy that is already in the tray. Setup commands
-(`--install-silent`, `--uninstall`) ask a running copy to close first, since an
+(`--install-silent`, `--uninstall`, `--apply-update`) ask a running copy to close first, since an
 installed executable cannot be replaced or removed while it runs.
 
 ### Uninstalling
@@ -52,6 +55,35 @@ Add or Remove Programs, or:
 Captures and recordings are never touched. Settings stay in
 `%APPDATA%\KAM Capture Tool` in case you reinstall; delete that folder to remove
 them too.
+
+## Updates
+
+The circular arrow at the top right of the home window checks GitHub for a newer
+release. The tool also checks by itself, a few seconds after starting and every
+six hours. When there is one:
+
+| Where | What you see |
+|---|---|
+| Home window | The arrow becomes a gold **Update to x.y.z** button, and a bar offers **What's new**, **Not now** and **Update now** |
+| Tray | A notice, once per version, and **Update to x.y.z…** at the top of the menu |
+
+**Update now** downloads `KamCapture.exe` from the release into
+`%TEMP%\KAM Capture Tool\Updates`, checks its SHA-256 against the digest GitHub
+publishes, checks the file says it is the version the release says, and then
+starts it with `--apply-update`. That copy asks the running one to close,
+installs itself over it — same folder, same shortcuts, same startup choice — and
+starts. Updating closes any open annotator, so it asks first; during a recording
+it asks you to stop the recording first.
+
+**Not now** hides that version until a newer one is published. The button stays
+gold.
+
+A copy that was never installed shows **Get the update**, which opens the release
+page instead. Opening a newer download by hand while the tool is running offers
+the update as well, and closes the running copy only once you agree.
+
+The automatic check can be switched off in Settings, under Updates. Clicking the
+arrow still checks.
 
 ## Recording prerequisites
 
@@ -71,10 +103,12 @@ executable, or wherever you point it in Settings.
 |---|---|
 | `%APPDATA%\KAM Capture Tool\settings.json` | Every setting |
 | `%APPDATA%\KAM Capture Tool\kam-capture.log` | A short rolling log, trimmed at 512 KB |
+| `%TEMP%\KAM Capture Tool\Updates` | A downloaded update, deleted once it is installed |
 | `Pictures\KAM Capture Tool\Screenshots` | Saved captures, by default |
 | `Videos\KAM Capture Tool\Recordings` | Saved recordings, by default |
 
-Nothing is written anywhere else, and nothing is sent anywhere.
+Nothing is written anywhere else. The only thing sent anywhere is the update
+check, described above.
 
 Closing the last annotator brings the home window back, so the next capture is
 always one click away.

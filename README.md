@@ -216,8 +216,9 @@ who wants to show you a bug in it.
 
 - **Not a video editor.** It records and saves a file. Trimming belongs
   elsewhere.
-- **Not an uploader.** Nothing is sent anywhere. There is no account, no
-  telemetry and no network code in this application at all.
+- **Not an uploader.** Nothing you capture is sent anywhere. There is no
+  account and no telemetry; the one network request is the update check, and
+  it can be switched off.
 - **Not an OCR or "explain this screenshot" tool.** It hands you an image; what
   reads it is your business.
 - **Not a screen-sharing tool.** It writes files.
@@ -228,7 +229,7 @@ who wants to show you a bug in it.
 2. The tool never appears in its own output.
 3. One font. Fewer decisions per screenshot.
 4. Depth behind one control, not clutter across many. Thirty symbols, one button.
-5. Nothing leaves the machine.
+5. Nothing you capture leaves the machine.
 
 ## Architecture
 
@@ -279,9 +280,8 @@ left it.
 
 Running a newer download over an installed copy updates it where it is, and
 starts from the choices you already made — which shortcuts you kept, and
-whether it starts with Windows. Close the copy in the tray first (right-click,
-**Exit**): opened while an older copy is running, the download only brings
-that copy's window up.
+whether it starts with Windows. If the old one is running in the tray, the
+download offers the update and closes it for you once you say yes.
 
 Uninstalling is in Add or Remove Programs, or:
 
@@ -307,6 +307,32 @@ Needs the .NET 9 SDK. `build.ps1` regenerates the icon, runs the self-test,
 publishes the single-file executable to `dist/`, and can install it with
 `-Install`.
 
+## Updates
+
+<p align="center">
+  <img src="docs/images/update.png" width="640" alt="The home window with an update waiting: a bar across the top, and the update button turned gold">
+</p>
+
+The circular arrow at the top right of the home window checks for a newer
+version, and it checks by itself as well — a few seconds after starting, then
+every six hours. When there is one, the arrow becomes a gold **Update to x.y.z**
+button and a bar says what changed, with **What's new**, **Not now** and
+**Update now**. If the window is closed, a tray notice says it once.
+
+**Update now** downloads the new executable, checks it against the SHA-256
+GitHub published for it, and hands over. The running copy closes, the new one
+installs itself into the same folder with the same shortcuts and startup choice,
+and opens again on the new version. **Not now** leaves that version alone until
+a newer one lands; the button stays gold, so it is still one click away.
+
+`scripts/test-update.ps1` runs the whole round trip between two local builds in
+a sandbox. A download with the wrong checksum is refused and nothing changes; a
+good one ends with the new version running where the old one was, and the old
+one gone.
+
+The check is one request to GitHub's releases API. It sends the tool's version
+and nothing about you or your captures, and it can be switched off in Settings.
+
 ## Shortcuts
 
 | | |
@@ -326,7 +352,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.1.2. Everything described above is implemented and works.
+Version 1.2.0. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
@@ -339,6 +365,7 @@ Version 1.1.2. Everything described above is implemented and works.
 | Export at 1x–4x, clipboard, PNG/JPG | Done |
 | Recording with live audio switching | Done |
 | Self-install, shortcuts, uninstall entry | Done |
+| Updates from GitHub, with a prompt | Done |
 | Global shortcuts, tray | Done |
 
 The honest gaps:
@@ -354,8 +381,15 @@ The honest gaps:
   measured — `--rectest` writes exactly `fps × seconds` frames beside a
   continuous audio track — but switching microphone mid-take and stopping from
   the shortcut have only been reasoned about, not exercised end to end.
+- **The updater has only updated itself in a sandbox so far.** 1.2.0 is the
+  first version that has one, so the first real update is the next release.
+  Until then the evidence is `scripts/test-update.ps1`, which runs the whole
+  thing — check, download, checksum, hand-over, restart — between two builds.
 - **Unsigned.** SmartScreen will warn on first run until it has seen enough
-  downloads. Signing needs a certificate this does not have.
+  downloads, and an update is trusted only as far as the GitHub account that
+  published it: the checksum proves the download is the file that was
+  released, not who released it. Signing needs a certificate this does not
+  have.
 
 ## Licence
 

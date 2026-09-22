@@ -203,10 +203,17 @@
                             <ContentControl x:Name="HostHkRecord" Width="160"/>
                         </StackPanel>
 
-                        <StackPanel Style="{StaticResource Row}" Margin="0">
+                        <StackPanel Style="{StaticResource Row}">
                             <TextBlock Style="{StaticResource RowLabel}" Text="Startup"/>
                             <CheckBox x:Name="ChkStartup" Content="Start with Windows" Margin="0,0,20,0"/>
                             <CheckBox x:Name="ChkTray" Content="Start hidden in the tray"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}" Margin="0">
+                            <TextBlock Style="{StaticResource RowLabel}" Text="Updates"/>
+                            <CheckBox x:Name="ChkUpdates" Content="Check GitHub for new versions" Margin="0,0,20,0"
+                                      ToolTip="One request to GitHub a few seconds after start and every six hours. Nothing about you or your captures is sent."/>
+                            <TextBlock x:Name="LblVersion" Style="{StaticResource Label}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>

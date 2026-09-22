@@ -24,79 +24,175 @@
             <Setter Property="Stretch" Value="None"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
+
+        <!-- The update button: a quiet icon until there is something to say,
+             then a gold chip that says it. -->
+        <Style x:Key="UpdateChip" TargetType="Button">
+            <Setter Property="Foreground" Value="{StaticResource FgDim}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chip" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                                CornerRadius="14" Padding="8,5" SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chip" Property="Background" Value="{StaticResource PanelHi}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chip" Property="BorderBrush" Value="{StaticResource Accent}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="UpdateGlyph" TargetType="Path">
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="Fill" Value="Transparent"/>
+            <Setter Property="StrokeLineJoin" Value="Round"/>
+            <Setter Property="StrokeStartLineCap" Value="Round"/>
+            <Setter Property="StrokeEndLineCap" Value="Round"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stretch" Value="None"/>
+        </Style>
     </Window.Resources>
 
-    <Grid Margin="24,20,24,0">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <DockPanel>
+        <!-- Shown only when there is an update to talk about. The window grows
+             by its height rather than squeezing what is below. -->
+        <Border x:Name="UpdateBar" DockPanel.Dock="Top" Visibility="Collapsed"
+                Background="{StaticResource Panel}" BorderBrush="{StaticResource Edge}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid Margin="24,10,24,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Ellipse x:Name="UpdateDot" Width="8" Height="8" Fill="{StaticResource Accent}"
+                             VerticalAlignment="Center" Margin="0,0,11,0"/>
+                    <TextBlock Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="18">
+                        <Run x:Name="RunUpdate"/>
+                        <Hyperlink x:Name="LnkWhatsNew" Click="OnWhatsNew" Foreground="{StaticResource Accent}"
+                                   TextDecorations="{x:Null}">What's new</Hyperlink>
+                    </TextBlock>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+                        <Button x:Name="BtnBarSecondary" Content="Not now" Click="OnBarSecondary"/>
+                        <Button x:Name="BtnBarPrimary" Style="{StaticResource PrimaryButton}" Content="Update now"
+                                Margin="8,0,0,0" Click="OnBarPrimary"/>
+                    </StackPanel>
+                </Grid>
+                <ProgressBar x:Name="UpdateProgress" Height="3" VerticalAlignment="Bottom" Visibility="Collapsed"
+                             Minimum="0" Maximum="1" Background="Transparent" BorderThickness="0"
+                             Foreground="{StaticResource Accent}"/>
+            </Grid>
+        </Border>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,22">
-            <Image Source="pack://application:,,,/Assets/kam-capture.png"
-                   Width="40" Height="40" VerticalAlignment="Center"
-                   RenderOptions.BitmapScalingMode="HighQuality"/>
-            <StackPanel Margin="13,0,0,0" VerticalAlignment="Center">
-                <TextBlock Text="KAM Capture Tool" FontSize="19" FontWeight="SemiBold"/>
-                <TextBlock x:Name="LblSubtitle" Style="{StaticResource Label}" Margin="0,2,0,0"/>
+        <Grid Margin="24,20,24,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,22">
+                <StackPanel Orientation="Horizontal">
+                    <Image Source="pack://application:,,,/Assets/kam-capture.png"
+                           Width="40" Height="40" VerticalAlignment="Center"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <StackPanel Margin="13,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="KAM Capture Tool" FontSize="19" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="LblSubtitle" Style="{StaticResource Label}" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <Button x:Name="BtnUpdates" Style="{StaticResource UpdateChip}" Click="OnUpdatesClick"
+                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-3,0,0"
+                        AutomationProperties.Name="Updates">
+                    <StackPanel Orientation="Horizontal">
+                        <Grid Width="16" Height="16">
+                            <!-- Circling arrow: check for updates. -->
+                            <Path x:Name="IconCheck" Style="{StaticResource UpdateGlyph}" RenderTransformOrigin="0.5,0.5"
+                                  Data="M13.9,8.7 A5.9,5.9 0 1 1 12.2,3.9 M13.4,1.7 L13.4,4.9 L10.2,4.9">
+                                <Path.RenderTransform>
+                                    <RotateTransform x:Name="SpinCheck"/>
+                                </Path.RenderTransform>
+                            </Path>
+                            <!-- Arrow into a tray: a new version to download. -->
+                            <Path x:Name="IconDownload" Style="{StaticResource UpdateGlyph}" Visibility="Collapsed"
+                                  Data="M8,2 L8,10.4 M4.6,7 L8,10.4 L11.4,7 M2.5,13.8 L13.5,13.8"/>
+                        </Grid>
+                        <TextBlock x:Name="LblUpdates" Margin="7,0,1,0" FontSize="12.5" VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <StackPanel Grid.Row="1" Orientation="Horizontal">
+                <ToggleButton x:Name="ModeRegion" Style="{StaticResource ModeTile}" Tag="Region" Click="OnModeClick"
+                              ToolTip="Drag any part of the screen. The selection stays adjustable before you commit.">
+                    <StackPanel>
+                        <Path Style="{StaticResource ModeIcon}" Data="M3,7 L3,3 L7,3 M15,3 L19,3 L19,7 M3,15 L3,19 L7,19 M19,15 L19,19 L15,19"/>
+                        <TextBlock Text="Capture" HorizontalAlignment="Center" Margin="0,8,0,0" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </ToggleButton>
+                <ToggleButton x:Name="ModeWindow" Style="{StaticResource ModeTile}" Tag="Window" Click="OnModeClick"
+                              ToolTip="Hover any window and click it.">
+                    <StackPanel>
+                        <Path Style="{StaticResource ModeIcon}" Data="M3,5 L19,5 L19,17 L3,17 Z M3,8.5 L19,8.5"/>
+                        <TextBlock Text="Window" HorizontalAlignment="Center" Margin="0,8,0,0" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </ToggleButton>
+                <ToggleButton x:Name="ModeMonitor" Style="{StaticResource ModeTile}" Tag="Monitor" Click="OnModeClick"
+                              Margin="0" ToolTip="The whole display the pointer is on.">
+                    <StackPanel>
+                        <Path Style="{StaticResource ModeIcon}" Data="M2.5,4 L19.5,4 L19.5,14.5 L2.5,14.5 Z M8,18 L14,18 M11,14.5 L11,18"/>
+                        <TextBlock Text="Monitor" HorizontalAlignment="Center" Margin="0,8,0,0" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </ToggleButton>
             </StackPanel>
-        </StackPanel>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal">
-            <ToggleButton x:Name="ModeRegion" Style="{StaticResource ModeTile}" Tag="Region" Click="OnModeClick"
-                          ToolTip="Drag any part of the screen. The selection stays adjustable before you commit.">
-                <StackPanel>
-                    <Path Style="{StaticResource ModeIcon}" Data="M3,7 L3,3 L7,3 M15,3 L19,3 L19,7 M3,15 L3,19 L7,19 M19,15 L19,19 L15,19"/>
-                    <TextBlock Text="Capture" HorizontalAlignment="Center" Margin="0,8,0,0" FontWeight="SemiBold"/>
-                </StackPanel>
-            </ToggleButton>
-            <ToggleButton x:Name="ModeWindow" Style="{StaticResource ModeTile}" Tag="Window" Click="OnModeClick"
-                          ToolTip="Hover any window and click it.">
-                <StackPanel>
-                    <Path Style="{StaticResource ModeIcon}" Data="M3,5 L19,5 L19,17 L3,17 Z M3,8.5 L19,8.5"/>
-                    <TextBlock Text="Window" HorizontalAlignment="Center" Margin="0,8,0,0" FontWeight="SemiBold"/>
-                </StackPanel>
-            </ToggleButton>
-            <ToggleButton x:Name="ModeMonitor" Style="{StaticResource ModeTile}" Tag="Monitor" Click="OnModeClick"
-                          Margin="0" ToolTip="The whole display the pointer is on.">
-                <StackPanel>
-                    <Path Style="{StaticResource ModeIcon}" Data="M2.5,4 L19.5,4 L19.5,14.5 L2.5,14.5 Z M8,18 L14,18 M11,14.5 L11,18"/>
-                    <TextBlock Text="Monitor" HorizontalAlignment="Center" Margin="0,8,0,0" FontWeight="SemiBold"/>
-                </StackPanel>
-            </ToggleButton>
-        </StackPanel>
+            <Grid Grid.Row="2" Margin="0,20,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-        <Grid Grid.Row="2" Margin="0,20,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" x:Name="BtnCapture" Style="{StaticResource PrimaryButton}"
+                        Content="New capture" Padding="0,13" FontSize="15" Click="OnCapture"/>
+                <ComboBox Grid.Column="1" x:Name="CmbDelay" Width="112" Height="46" Margin="8,0,0,0"
+                          VerticalContentAlignment="Center" ToolTip="Wait before capturing"/>
+                <Button Grid.Column="2" x:Name="BtnRecord" Content="Record" Padding="22,13" Margin="8,0,0,0"
+                        FontSize="15" Click="OnRecord"/>
+            </Grid>
 
-            <Button Grid.Column="0" x:Name="BtnCapture" Style="{StaticResource PrimaryButton}"
-                    Content="New capture" Padding="0,13" FontSize="15" Click="OnCapture"/>
-            <ComboBox Grid.Column="1" x:Name="CmbDelay" Width="112" Height="46" Margin="8,0,0,0"
-                      VerticalContentAlignment="Center" ToolTip="Wait before capturing"/>
-            <Button Grid.Column="2" x:Name="BtnRecord" Content="Record" Padding="22,13" Margin="8,0,0,0"
-                    FontSize="15" Click="OnRecord"/>
+            <TextBlock Grid.Row="3" x:Name="LblStatus" Style="{StaticResource Label}" TextWrapping="Wrap"
+                       Margin="0,18,0,0" VerticalAlignment="Top"/>
+
+            <Grid Grid.Row="4" Margin="0,12,0,18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="Settings" Click="OnSettings"/>
+                <Button Grid.Column="1" Content="Open folder" Margin="8,0,0,0" Click="OnOpenFolder"/>
+                <TextBlock Grid.Column="2" x:Name="LblHotkeys" Style="{StaticResource Label}"
+                           VerticalAlignment="Center" TextAlignment="Right" Margin="12,0,0,0"/>
+            </Grid>
         </Grid>
-
-        <TextBlock Grid.Row="3" x:Name="LblStatus" Style="{StaticResource Label}" TextWrapping="Wrap"
-                   Margin="0,18,0,0" VerticalAlignment="Top"/>
-
-        <Grid Grid.Row="4" Margin="0,12,0,18">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Content="Settings" Click="OnSettings"/>
-            <Button Grid.Column="1" Content="Open folder" Margin="8,0,0,0" Click="OnOpenFolder"/>
-            <TextBlock Grid.Column="2" x:Name="LblHotkeys" Style="{StaticResource Label}"
-                       VerticalAlignment="Center" TextAlignment="Right" Margin="12,0,0,0"/>
-        </Grid>
-    </Grid>
+    </DockPanel>
 </Window>

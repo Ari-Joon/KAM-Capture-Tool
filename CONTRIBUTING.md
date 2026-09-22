@@ -52,12 +52,30 @@ The rest run on your machine rather than in CI:
 | `--ghosttest` | The tool's own windows leave nothing in a desktop grab. Scores each hiding strategy, and fails if the one in use leaks more than 2% |
 | `--lifecycletest` | After a capture, the home window and any open annotator come back where they should |
 | `--foldertest` | A OneDrive folder Windows chose is moved back to local disk; one you confirmed is left alone |
+| `--updatetest` | Versions compare number by number, GitHub's reply is read correctly, a download that fails its checksum is refused and removed, a failed program swap puts the old one back, and a download opened over a running copy is offered as an update. No network |
 | `--installtest` | "Start with Windows" starts the installed copy, not the download, and an unattended update keeps the folder, shortcuts and startup choice. Runs against a scratch registry key and folders, then checks the real install was left alone |
 
 Each was run once against the bug it guards, to watch it fail, before it was
 trusted to pass. Keep doing that for new checks: the first ghost test scored
 every strategy 0%, including the broken one, because its window had no title
 bar and Windows does not animate those. It passed and proved nothing.
+
+The update itself — check, download, checksum, hand-over, restart — takes two
+builds and two processes, so it is a script rather than a flag:
+
+```powershell
+./scripts/test-update.ps1
+```
+
+It builds this version and a newer one, installs the older into a sandbox,
+runs it hidden against a local copy of a release feed, and asks it to update
+twice: once with a checksum that does not match, which must be refused with
+nothing changed, and once for real, which must end with the newer version
+running where the old one was. `KAM_CAPTURE_SANDBOX` gives every copy it starts
+its own folder, registry key and single-instance lock, so it runs beside a real
+install without touching it, and it checks at the end that it did not.
+`KAM_CAPTURE_UPDATE_FEED` stands in for GitHub, and is ignored outside a
+sandbox.
 
 The selection overlay itself is still not covered, because it needs a pointer.
 If you change it, say in the pull request what you did by hand to check it.

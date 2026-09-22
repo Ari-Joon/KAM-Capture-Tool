@@ -33,9 +33,17 @@ namespace KamCapture.Setup
                     "Programs", ProductName),
                 Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
                 Environment.GetFolderPath(Environment.SpecialFolder.Programs));
+
+            /// <summary>Everything under one folder and one registry key, for the checks.</summary>
+            public static Footprint In(string folder, string regRoot) => new(
+                regRoot + @"\App", regRoot + @"\Uninstall", regRoot + @"\Run",
+                Path.Combine(folder, "Programs", ProductName),
+                Path.Combine(folder, "Desktop"), Path.Combine(folder, "Start Menu"));
         }
 
-        internal static Footprint Where { get; set; } = Footprint.Real;
+        internal static Footprint Where { get; set; } = Services.Sandbox.Active
+            ? Footprint.In(Services.Sandbox.Root!, $@"Software\KAM\Capture Tool (sandbox {Services.Sandbox.Id})")
+            : Footprint.Real;
 
         private static string RegRoot => Where.RegRoot;
         private static string UninstallRoot => Where.UninstallRoot;
@@ -56,6 +64,20 @@ namespace KamCapture.Setup
                 {
                     using var key = Registry.CurrentUser.OpenSubKey(RegRoot);
                     return key?.GetValue("InstallPath") as string;
+                }
+                catch { return null; }
+            }
+        }
+
+        /// <summary>The version the installed copy registered, if there is one.</summary>
+        public static string? InstalledVersion
+        {
+            get
+            {
+                try
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(RegRoot);
+                    return key?.GetValue("Version") as string;
                 }
                 catch { return null; }
             }
@@ -132,15 +154,7 @@ namespace KamCapture.Setup
                     StringComparison.OrdinalIgnoreCase))
             {
                 progress?.Invoke("Copying the application");
-
-                // An older copy may be running; move it aside rather than fail.
-                if (File.Exists(targetExe))
-                {
-                    var stale = targetExe + ".old";
-                    try { if (File.Exists(stale)) File.Delete(stale); } catch { }
-                    try { File.Move(targetExe, stale); } catch { }
-                }
-                File.Copy(sourceExe, targetExe, overwrite: true);
+                ReplaceExe(sourceExe, targetExe);
             }
 
             progress?.Invoke("Registering");
@@ -194,6 +208,37 @@ namespace KamCapture.Setup
 
             progress?.Invoke("Done");
             return targetExe;
+        }
+
+        /// <summary>
+        /// Put <paramref name="source"/> where <paramref name="target"/> is. A
+        /// running executable cannot be overwritten but can be renamed, so the
+        /// old one is moved aside first — and moved back if the copy fails, so
+        /// a failed update never leaves the install folder without a program.
+        /// </summary>
+        internal static void ReplaceExe(string source, string target)
+        {
+            var stale = target + ".old";
+            bool movedAside = false;
+            if (File.Exists(target))
+            {
+                try { if (File.Exists(stale)) File.Delete(stale); } catch { }
+                try { File.Move(target, stale); movedAside = true; } catch { }
+            }
+
+            try
+            {
+                File.Copy(source, target, overwrite: true);
+            }
+            catch
+            {
+                if (movedAside)
+                {
+                    try { if (File.Exists(target)) File.Delete(target); } catch { }
+                    try { File.Move(stale, target); } catch { }
+                }
+                throw;
+            }
         }
 
         /// <summary>

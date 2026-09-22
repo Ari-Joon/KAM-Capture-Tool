@@ -13,6 +13,37 @@ namespace KamCapture.Setup
         /// <summary>True when the user chose to keep running this copy as-is.</summary>
         public bool RunPortable { get; private set; }
 
+        private bool _replaces;
+
+        /// <summary>
+        /// Opened over a copy that is already running — a newer download,
+        /// usually. The running copy is asked to close only once the user
+        /// clicks to go ahead; until then nothing is touched.
+        /// </summary>
+        public bool ReplacesRunningCopy
+        {
+            get => _replaces;
+            init
+            {
+                _replaces = value;
+                if (!value) return;
+
+                var running = Installer.InstalledVersion;
+                var mine = Installer.Version;
+                bool newer = System.Version.TryParse(running, out var r) &&
+                             System.Version.TryParse(mine, out var m) && m > r;
+
+                Title = newer ? "Update KAM Capture Tool" : "Install KAM Capture Tool";
+                BtnInstall.Content = newer ? "Update" : "Install";
+                BtnPortable.Visibility = Visibility.Collapsed;
+                LblStatus.Text = running == null
+                    ? "KAM Capture Tool is running. Installing closes it and puts this copy in its place."
+                    : newer
+                        ? $"KAM Capture Tool {running} is running. Updating closes it and replaces it with {mine}."
+                        : $"KAM Capture Tool {running} is running. Installing closes it and puts this copy of {mine} in its place.";
+            }
+        }
+
         public SetupWindow()
         {
             InitializeComponent();
@@ -73,6 +104,23 @@ namespace KamCapture.Setup
             BtnPortable.IsEnabled = false;
             BtnClose.IsEnabled = false;
             Bar.Visibility = Visibility.Visible;
+
+            // The running copy holds the program file and the shortcuts, and
+            // would take the new copy's launch for itself. It goes first.
+            if (ReplacesRunningCopy)
+            {
+                LblStatus.Text = "Closing the running copy…";
+                bool closed = await Task.Run(() =>
+                    Services.SingleInstance.AskRunningCopyToExit(TimeSpan.FromSeconds(15)));
+                if (!closed)
+                {
+                    Bar.Visibility = Visibility.Collapsed;
+                    LblStatus.Text = "KAM Capture Tool is still running. Close it from the tray, then try again.";
+                    BtnInstall.IsEnabled = true;
+                    BtnClose.IsEnabled = true;
+                    return;
+                }
+            }
 
             var options = new Installer.Options
             {

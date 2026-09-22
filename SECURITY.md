@@ -2,12 +2,22 @@
 
 ## What this application can reach
 
-KAM Capture Tool reads the screen, reads audio devices while recording, and
-writes files. That is the whole list.
+KAM Capture Tool reads the screen, reads audio devices while recording, writes
+files, and asks GitHub whether there is a newer version. That is the whole list.
 
-- **No network code.** There is no HTTP client, no socket, no telemetry, no
-  update check and no account. Nothing it captures can leave the machine through
-  it.
+- **One network request, and it can be switched off.** A few seconds after it
+  starts and every six hours after that, it asks
+  `api.github.com/repos/Ari-Joon/KAM-Capture-Tool/releases/latest` which
+  version is newest. The request carries the tool's version in its user agent
+  and nothing else — no account, no identifier, nothing about your captures.
+  GitHub sees your IP address, as it would for any web request. Settings,
+  under Updates, turns it off.
+- **Downloads only after a yes.** Update now fetches `KamCapture.exe` from that
+  release, and runs it only if its SHA-256 matches the digest GitHub publishes
+  and the file says it is the version the release says. Anything else is
+  deleted and nothing changes.
+- **No telemetry and no account.** Nothing it captures can leave the machine
+  through it.
 - **No elevation.** It installs per-user, runs as the invoking user, and has no
   service, driver or scheduled task.
 - **No kernel component.** Capture is done with documented user-mode APIs.
@@ -18,6 +28,7 @@ writes files. That is the whole list.
 |---|---|
 | `%APPDATA%\KAM Capture Tool\settings.json` | Settings |
 | `%APPDATA%\KAM Capture Tool\kam-capture.log` | A rolling log, trimmed at 512 KB |
+| `%TEMP%\KAM Capture Tool\Updates\` | A downloaded update, until it is installed |
 | `%LOCALAPPDATA%\Programs\KAM Capture Tool\` | The executable, if installed |
 | `HKCU\Software\KAM\Capture Tool` | Install path and version |
 | `HKCU\...\CurrentVersion\Uninstall\KAMCaptureTool` | Add or Remove Programs entry |
@@ -43,6 +54,13 @@ recording. Check before sending.
 the SHA-256 of a release against the checksum published with it, or build from
 source.
 
+**An update is trusted as far as GitHub is.** The checksum proves the download
+is the file that was released — not corrupted, not swapped in transit — but not
+who released it. If the GitHub account publishing releases were compromised, a
+malicious release would pass. Code signing is what closes that, and this is not
+signed. Switch the check off if that matters to you, and update by hand after
+reading the release.
+
 **`--uninstall` deletes the install folder.** If you installed to a folder you
 were also using for something else, it takes that with it. The default location
 is a folder of its own for this reason.
@@ -54,6 +72,6 @@ Open an issue at
 rather not post publicly, say so in the issue without the detail and we will
 find another channel.
 
-This is a desktop utility with no server, no accounts and no network surface, so
-the realistic risk is a local one: a crafted image, a malformed settings file, or
+This is a desktop utility with no server, no accounts and one outbound request,
+so the realistic risk is a local one, or a bad release: a crafted image, a malformed settings file, or
 a path handled carelessly. Those are worth reporting.

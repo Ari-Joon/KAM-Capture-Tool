@@ -158,6 +158,8 @@ namespace KamCapture.UI
             // without going through here.
             ChkStartup.IsChecked = StartupRegistration.IsSet();
             ChkTray.IsChecked = c.StartMinimisedToTray;
+            ChkUpdates.IsChecked = c.CheckForUpdates;
+            LblVersion.Text = "You have " + Setup.Updater.Current.ToString(3);
 
             UpdateLabels();
             CheckFfmpeg();
@@ -343,6 +345,7 @@ namespace KamCapture.UI
             if (startup != StartupRegistration.IsSet()) StartupRegistration.Set(startup);
             c.RunAtStartup = startup;
             c.StartMinimisedToTray = ChkTray.IsChecked == true;
+            c.CheckForUpdates = ChkUpdates.IsChecked == true;
 
             c.Save();
             DialogResult = true;

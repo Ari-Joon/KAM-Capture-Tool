@@ -74,11 +74,21 @@ namespace KamCapture.Settings
         public bool SkipSetupPrompt { get; set; } = false;
         public bool RunAtStartup { get; set; } = false;
 
+        // ---- Updates ----
+        public bool CheckForUpdates { get; set; } = true;
+
+        /// <summary>A version the user said "Not now" to. Not offered again until a newer one.</summary>
+        public string SkippedUpdate { get; set; } = "";
+
+        /// <summary>The version the tray last announced, so each is announced once.</summary>
+        public string AnnouncedUpdate { get; set; } = "";
+
         // ---------------------------------------------------------------
 
         [JsonIgnore]
-        public static string Folder =>
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KAM Capture Tool");
+        public static string Folder => Services.Sandbox.Active
+            ? Path.Combine(Services.Sandbox.Root!, "AppData")
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "KAM Capture Tool");
 
         [JsonIgnore]
         public static string FilePath => Path.Combine(Folder, "settings.json");
@@ -131,7 +141,7 @@ namespace KamCapture.Settings
         /// <summary>
         /// Keep output local and organised. An empty setting, one Windows has
         /// redirected into OneDrive, or one of the old flat folders all move to
-        /// the current default â€” bringing anything this tool wrote along with
+        /// the current default — bringing anything this tool wrote along with
         /// them. A folder the user deliberately chose is left alone.
         /// </summary>
         internal static string Relocate(string configured, string localDefault, string extension,
@@ -155,8 +165,8 @@ namespace KamCapture.Settings
 
         /// <summary>
         /// The folder captures will actually be written to, created and proven
-        /// writable first. If the configured one cannot be used â€” or has been
-        /// redirected into OneDrive â€” this returns a local one instead and
+        /// writable first. If the configured one cannot be used — or has been
+        /// redirected into OneDrive — this returns a local one instead and
         /// remembers it, so a capture is never lost to a folder problem and
         /// never quietly turned into an upload.
         /// </summary>

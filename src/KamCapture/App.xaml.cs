@@ -16,6 +16,13 @@ namespace KamCapture
         private static Forms.NotifyIcon? _tray;
         private static AppSettings _cfg = new();
         private static MainWindow? _main;
+        private static Forms.ToolStripMenuItem? _trayUpdate;
+        private static bool _balloonIsUpdate;
+
+        /// <summary>Set once the application is really exiting; until then the home window only hides.</summary>
+        public static bool IsQuitting { get; private set; }
+
+        public static bool HasTray => _tray != null;
 
         protected override void OnStartup(StartupEventArgs e)
         {
@@ -95,6 +102,13 @@ namespace KamCapture
                 return;
             }
 
+            if (e.Args.Any(a => a.Equals("--updatetest", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = SelfTest.UpdateTest();
+                Shutdown();
+                return;
+            }
+
             var recTest = e.Args.FirstOrDefault(a => a.StartsWith("--rectest=", StringComparison.OrdinalIgnoreCase));
             if (recTest != null)
             {
@@ -130,6 +144,19 @@ namespace KamCapture
                 if (HandleSetupArguments(e.Args)) return;
             }
 
+            // A different copy opened plainly while one is running is almost
+            // always a newer download. Handing it over would only bring the
+            // running copy's window up, so offer to install over it instead;
+            // the running copy is closed only if the user goes ahead.
+            if (ShouldOfferUpdate(SingleInstance.IsAnotherCopyRunning(), Installer.InstalledDir,
+                                  Installer.CurrentDir, e.Args))
+            {
+                Log.Info($"Offering {Installer.Version} over the running copy ({Installer.InstalledVersion})");
+                new SetupWindow { ReplacesRunningCopy = true }.ShowDialog();
+                Shutdown();
+                return;
+            }
+
             // One instance owns the global shortcuts. A second launch hands its
             // arguments over and exits quietly rather than showing a dialog.
             if (!SingleInstance.Claim())
@@ -159,11 +186,108 @@ namespace KamCapture
             var mode = e.Args.FirstOrDefault(a => a.StartsWith("--capture=", StringComparison.OrdinalIgnoreCase));
             if (mode != null && Enum.TryParse<SnipMode>(mode["--capture=".Length..], true, out var m))
                 _ = CaptureController.RunAsync(m, _cfg);
+
+            StartUpdates(e.Args);
         }
 
         private static bool IsSetupCommand(string[] args) =>
             args.Any(a => a.Equals("--uninstall", StringComparison.OrdinalIgnoreCase) ||
-                          a.Equals("--install-silent", StringComparison.OrdinalIgnoreCase));
+                          a.Equals("--install-silent", StringComparison.OrdinalIgnoreCase) ||
+                          a.Equals("--apply-update", StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// True for the case that used to go wrong: a plain launch of a copy
+        /// other than the installed one while the installed one is running.
+        /// Anything with arguments is a command for the running copy and is
+        /// still handed over.
+        /// </summary>
+        internal static bool ShouldOfferUpdate(bool anotherRunning, string? installedDir, string currentDir,
+                                               string[] args)
+        {
+            if (!anotherRunning || string.IsNullOrWhiteSpace(installedDir) || args.Length > 0) return false;
+            try
+            {
+                return !string.Equals(
+                    System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(installedDir)),
+                    System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(currentDir)),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+            catch { return false; }
+        }
+
+        // ---------------- updates ----------------
+
+        private static void StartUpdates(string[] args)
+        {
+            Updater.CleanUpDownloads();
+            UpdateService.Changed += OnUpdateChanged;
+            UpdateService.Start(_cfg);
+
+            var from = args.FirstOrDefault(a => a.StartsWith("--updated-from=", StringComparison.OrdinalIgnoreCase));
+            if (from != null)
+            {
+                var previous = from["--updated-from=".Length..];
+                Log.Info($"Now running {Updater.Current.ToString(3)}, updated from {previous}");
+                _main?.ShowUpdated(previous);
+                if (_main is { IsVisible: false })
+                    Balloon($"KAM Capture Tool is now {Updater.Current.ToString(3)}", "Updated from " + previous + ".", update: false);
+            }
+
+            if (args.Any(a => a.Equals("--update", StringComparison.OrdinalIgnoreCase)))
+                _ = UpdateNowAsync();
+        }
+
+        /// <summary>
+        /// --update on the command line: check, and install if there is
+        /// something newer. Running the command is the yes.
+        /// </summary>
+        private static async System.Threading.Tasks.Task UpdateNowAsync()
+        {
+            if (!Installer.IsRunningInstalled)
+            {
+                Log.Info("--update ignored: this copy is not installed");
+                return;
+            }
+            await UpdateService.CheckAsync(manual: true);
+            if (UpdateService.Release != null)
+                await UpdateService.InstallAsync(hidden: !(_main?.IsVisible ?? false), tray: HasTray);
+        }
+
+        private static void OnUpdateChanged()
+        {
+            var release = UpdateService.Release;
+            bool offering = release != null && UpdateService.Now is UpdateService.Stage.Available
+                or UpdateService.Stage.Downloading or UpdateService.Stage.Failed;
+
+            if (_trayUpdate != null)
+            {
+                _trayUpdate.Visible = offering;
+                if (release != null) _trayUpdate.Text = $"Update to {release.Tag}…";
+            }
+
+            // Announce each new version once, and only to someone not already
+            // looking at the home window, where the bar says it anyway.
+            if (UpdateService.Now == UpdateService.Stage.Available && release != null &&
+                !UpdateService.IsSkipped && _cfg.AnnouncedUpdate != release.Tag &&
+                !(_main?.IsVisible ?? false))
+            {
+                _cfg.AnnouncedUpdate = release.Tag;
+                _cfg.Save();
+                var summary = release.Summary;
+                Balloon($"KAM Capture Tool {release.Tag} is available",
+                    (summary.Length > 0 ? char.ToUpperInvariant(summary[0]) + summary[1..] + ". " : "") + "Click to update.",
+                    update: true);
+            }
+        }
+
+        private static void Balloon(string title, string text, bool update)
+        {
+            if (_tray == null) return;
+            _balloonIsUpdate = update;
+            _tray.BalloonTipTitle = title;
+            _tray.BalloonTipText = text;
+            _tray.ShowBalloonTip(8000);
+        }
 
         /// <summary>Uninstall and silent-install run without any main window.</summary>
         private bool HandleSetupArguments(string[] args)
@@ -200,7 +324,48 @@ namespace KamCapture
                 return true;
             }
 
+            if (Has("--apply-update"))
+            {
+                // Started by the copy this one replaces, which has just closed.
+                // Install over it, keeping every choice it had, then start the
+                // new version the way the old one was showing.
+                var from = Installer.InstalledVersion ?? "an earlier version";
+                var show = (Has("--tray") ? " --tray" : "") + (Has("--no-tray") ? " --no-tray" : "");
+                try
+                {
+                    var exe = Installer.Install(Installer.Unattended());
+                    Log.Info($"Updated from {from} to {Installer.Version} at {exe}");
+                    StartCopy(exe, "--updated-from=" + from + show);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Applying the update", ex);
+                    MessageBox.Show("The update could not be installed.\n\n" + ex.Message +
+                                    "\n\nThe version you had is still in place.",
+                        Installer.ProductName, MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                    // Put the old copy back on its feet rather than leave nothing running.
+                    var dir = Installer.InstalledDir;
+                    if (dir != null) StartCopy(System.IO.Path.Combine(dir, Installer.ExeName), show.Trim());
+                }
+                Shutdown();
+                return true;
+            }
+
             return false;
+        }
+
+        private static void StartCopy(string exe, string args)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(exe, args)
+                {
+                    UseShellExecute = false,
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(exe) ?? ""
+                });
+            }
+            catch (Exception ex) { Log.Error("Starting " + exe, ex); }
         }
 
         /// <summary>
@@ -253,6 +418,12 @@ namespace KamCapture
                 return;
             }
 
+            if (args.Any(a => a.Equals("--update", StringComparison.OrdinalIgnoreCase)))
+            {
+                _ = UpdateNowAsync();
+                return;
+            }
+
             ShowMain();
         }
 
@@ -263,6 +434,12 @@ namespace KamCapture
             try
             {
                 var menu = new Forms.ContextMenuStrip();
+
+                // Only there while a new version is waiting.
+                _trayUpdate = new Forms.ToolStripMenuItem("Update…", null, (_, _) => ShowUpdate()) { Visible = false };
+                _trayUpdate.Font = new System.Drawing.Font(menu.Font, System.Drawing.FontStyle.Bold);
+                menu.Items.Add(_trayUpdate);
+
                 menu.Items.Add("New capture", null, (_, _) => Start(SnipMode.Region));
                 menu.Items.Add("Capture a window", null, (_, _) => Start(SnipMode.Window));
                 menu.Items.Add("Capture everything", null, (_, _) => Start(SnipMode.FullScreen));
@@ -271,6 +448,11 @@ namespace KamCapture
                 menu.Items.Add(new Forms.ToolStripSeparator());
                 menu.Items.Add("Open KAM Capture Tool", null, (_, _) => ShowMain());
                 menu.Items.Add("Settings…", null, (_, _) => OpenSettings());
+                menu.Items.Add("Check for updates", null, (_, _) =>
+                {
+                    ShowMain();
+                    if (_main != null) _ = _main.CheckForUpdatesAsync();
+                });
                 if (!Installer.IsRunningInstalled)
                     menu.Items.Add("Install KAM Capture Tool…", null, (_, _) => ShowSetup());
                 menu.Items.Add(new Forms.ToolStripSeparator());
@@ -284,6 +466,7 @@ namespace KamCapture
                     Icon = LoadIcon()
                 };
                 _tray.DoubleClick += (_, _) => ShowMain();
+                _tray.BalloonTipClicked += (_, _) => { if (_balloonIsUpdate) ShowUpdate(); };
             }
             catch
             {
@@ -310,6 +493,12 @@ namespace KamCapture
             _main.Activate();
         }
 
+        private static void ShowUpdate()
+        {
+            ShowMain();
+            _main?.ShowUpdateBar();
+        }
+
         private static void OpenSettings()
         {
             ShowMain();
@@ -320,7 +509,11 @@ namespace KamCapture
         private static void ShowSetup()
         {
             var setup = new SetupWindow();
-            if (setup.ShowDialog() == true && !setup.RunPortable) Current.Shutdown();
+            if (setup.ShowDialog() == true && !setup.RunPortable)
+            {
+                IsQuitting = true;
+                Current.Shutdown();
+            }
         }
 
         private static void Start(SnipMode mode) => _ = CaptureController.RunAsync(mode, _cfg);
@@ -369,6 +562,7 @@ namespace KamCapture
                 if (answer != MessageBoxResult.OK) return;
                 RecordingController.StopActiveNow();
             }
+            IsQuitting = true;
             Current.Shutdown();
         }
 
