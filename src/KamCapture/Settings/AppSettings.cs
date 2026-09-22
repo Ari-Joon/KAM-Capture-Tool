@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -54,6 +55,13 @@ namespace KamCapture.Settings
         public string VideoEncoder { get; set; } = "auto";    // auto | libx264 | h264_nvenc | h264_qsv | h264_amf
         public string RecordFolder { get; set; } = "";
 
+        /// <summary>
+        /// OneDrive folders the user explicitly chose and confirmed. Windows
+        /// redirecting Pictures into OneDrive is not a choice, and is undone; a
+        /// folder picked and confirmed in Settings is, and is left alone.
+        /// </summary>
+        public List<string> ConfirmedSyncedFolders { get; set; } = new();
+
         // ---- Hotkeys ----
         public string HotkeyRegion { get; set; } = "Ctrl+Shift+S";
         public string HotkeyFullScreen { get; set; } = "Ctrl+Shift+F";
@@ -104,9 +112,9 @@ namespace KamCapture.Settings
             // into a OneDrive sync root because Windows redirected Pictures,
             // put it back on local disk.
             var captures = Relocate(Current.SaveFolder,
-                Services.OutputFolder.DefaultCaptures(), ".png");
+                Services.OutputFolder.DefaultCaptures(), ".png", Current.IsChosen);
             var recordings = Relocate(Current.RecordFolder,
-                Services.OutputFolder.DefaultRecordings(), ".mp4");
+                Services.OutputFolder.DefaultRecordings(), ".mp4", Current.IsChosen);
 
             // Write the move back out, or the settings file keeps pointing at a
             // folder nothing is being saved to.
@@ -123,12 +131,17 @@ namespace KamCapture.Settings
         /// <summary>
         /// Keep output local and organised. An empty setting, one Windows has
         /// redirected into OneDrive, or one of the old flat folders all move to
-        /// the current default — bringing anything this tool wrote along with
+        /// the current default â€” bringing anything this tool wrote along with
         /// them. A folder the user deliberately chose is left alone.
         /// </summary>
-        private static string Relocate(string configured, string localDefault, string extension)
+        internal static string Relocate(string configured, string localDefault, string extension,
+                                       Func<string, bool> chosen)
         {
             if (string.IsNullOrWhiteSpace(configured)) return localDefault;
+
+            // A OneDrive folder the user picked and confirmed is theirs to keep.
+            if (Services.OutputFolder.IsSynced(configured) && chosen(configured))
+                return configured;
 
             if (Services.OutputFolder.IsSynced(configured) ||
                 Services.OutputFolder.IsLegacyLayout(configured))
@@ -142,18 +155,35 @@ namespace KamCapture.Settings
 
         /// <summary>
         /// The folder captures will actually be written to, created and proven
-        /// writable first. If the configured one cannot be used — or has been
-        /// redirected into OneDrive — this returns a local one instead and
+        /// writable first. If the configured one cannot be used â€” or has been
+        /// redirected into OneDrive â€” this returns a local one instead and
         /// remembers it, so a capture is never lost to a folder problem and
         /// never quietly turned into an upload.
         /// </summary>
         public string EnsureSaveFolder() =>
-            Remember(Services.OutputFolder.Resolve(SaveFolder, Services.OutputFolder.CapturesLeaf),
+            Remember(Services.OutputFolder.Resolve(SaveFolder, Services.OutputFolder.CapturesLeaf, IsChosen(SaveFolder)),
                      SaveFolder, v => SaveFolder = v, "Capture");
 
         public string EnsureRecordFolder() =>
-            Remember(Services.OutputFolder.Resolve(RecordFolder, Services.OutputFolder.RecordingsLeaf),
+            Remember(Services.OutputFolder.Resolve(RecordFolder, Services.OutputFolder.RecordingsLeaf, IsChosen(RecordFolder)),
                      RecordFolder, v => RecordFolder = v, "Recording");
+
+        /// <summary>True when this synced folder was explicitly confirmed in Settings.</summary>
+        public bool IsChosen(string? path)
+        {
+            var key = Normalise(path);
+            if (key == null) return false;
+            foreach (var chosen in ConfirmedSyncedFolders)
+                if (string.Equals(Normalise(chosen), key, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        public static string? Normalise(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return null;
+            try { return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path.Trim())); }
+            catch { return path.Trim(); }
+        }
 
         private string Remember(string resolved, string current, Action<string> set, string what)
         {

@@ -541,18 +541,42 @@ namespace KamCapture.UI
             timer.Start();
         }
 
+        /// <summary>
+        /// Take another capture without leaving the annotator. This window is
+        /// kept, work and all, and comes back once the new capture is taken.
+        /// </summary>
+        private void OnNewCapture(object sender, RoutedEventArgs e)
+        {
+            _surface.CommitTextEdit();
+            _ = Services.CaptureController.RunAsync(_cfg.DefaultMode, _cfg);
+        }
+
         // ---------------- keyboard ----------------
 
         private void OnKey(object sender, KeyEventArgs e)
         {
-            if (_surface.IsEditingText) return;
             bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
             bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+
+            // A text field has the keyboard — the font size box, the sequence
+            // list, or a text box on the board. Backspace, Delete, arrows and
+            // letters belong to it: handled here, Backspace in the font size
+            // box used to delete whatever shape was selected. Only the commands
+            // that mean nothing inside a text field still apply.
+            if (_surface.IsEditingText ||
+                Keyboard.FocusedElement is TextBoxBase or ComboBox or ComboBoxItem)
+            {
+                if (ctrl && e.Key == Key.S) { OnSave(this, new RoutedEventArgs()); e.Handled = true; }
+                else if (ctrl && shift && e.Key == Key.C) { OnCopy(this, new RoutedEventArgs()); e.Handled = true; }
+                else if (ctrl && e.Key == Key.N) { OnNewCapture(this, new RoutedEventArgs()); e.Handled = true; }
+                return;
+            }
 
             if (ctrl)
             {
                 switch (e.Key)
                 {
+                    case Key.N: OnNewCapture(this, new RoutedEventArgs()); e.Handled = true; return;
                     case Key.Z: _surface.Undo.Undo(); UpdateChrome(); e.Handled = true; return;
                     case Key.Y: _surface.Undo.Redo(); UpdateChrome(); e.Handled = true; return;
                     case Key.S: OnSave(this, new RoutedEventArgs()); e.Handled = true; return;

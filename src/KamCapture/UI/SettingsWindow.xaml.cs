@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -19,6 +20,7 @@ namespace KamCapture.UI
         private ColorButton _borderColor = null!, _inkColor = null!;
         private HotkeyBox _hkRegion = null!, _hkWindow = null!, _hkFull = null!, _hkRecord = null!;
         private bool _ready;
+        private readonly HashSet<string> _confirmed = new(StringComparer.OrdinalIgnoreCase);
 
         public SettingsWindow(AppSettings cfg)
         {
@@ -27,6 +29,9 @@ namespace KamCapture.UI
 
             WindowStyling.ApplyDarkChrome(this);
             try { Icon = BitmapFrame.Create(new Uri("pack://application:,,,/Assets/kam-capture.ico")); } catch { }
+
+            foreach (var f in cfg.ConfirmedSyncedFolders)
+                if (AppSettings.Normalise(f) is { } key) _confirmed.Add(key);
 
             BuildControls();
             LoadFrom(cfg);
@@ -230,15 +235,37 @@ namespace KamCapture.UI
             if (Directory.Exists(target.Text)) dlg.InitialDirectory = target.Text;
             if (dlg.ShowDialog(this) != true) return;
 
-            if (OutputFolder.IsSynced(dlg.FolderName))
-            {
-                var answer = MessageBox.Show(
-                    "That folder is inside OneDrive, so every capture would be uploaded.\n\nUse it anyway?",
-                    "KAM Capture Tool", MessageBoxButton.YesNo, MessageBoxImage.Question);
-                if (answer != MessageBoxResult.Yes) return;
-            }
-
+            if (!ConfirmIfSynced(dlg.FolderName)) return;
             target.Text = dlg.FolderName;
+        }
+
+        /// <summary>
+        /// Ask once before using a folder inside OneDrive, and remember the
+        /// answer, so a confirmed choice is honoured from then on rather than
+        /// quietly moved back to local disk at the next save or launch.
+        /// </summary>
+        private bool ConfirmIfSynced(string folder)
+        {
+            if (!OutputFolder.IsSynced(folder)) return true;
+            var key = AppSettings.Normalise(folder);
+            if (key != null && _confirmed.Contains(key)) return true;
+
+            var answer = MessageBox.Show(
+                "That folder is inside OneDrive, so every capture saved there would be uploaded.\n\nUse it anyway?",
+                "KAM Capture Tool", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (answer != MessageBoxResult.Yes) return false;
+
+            if (key != null) _confirmed.Add(key);
+            return true;
+        }
+
+        /// <summary>A folder typed rather than browsed gets the same question.</summary>
+        private string ChooseFolder(TextBox box, string localDefault)
+        {
+            var chosen = box.Text.Trim();
+            if (ConfirmIfSynced(chosen)) return chosen;
+            box.Text = localDefault;
+            return localDefault;
         }
 
         private void OnFindFfmpeg(object sender, RoutedEventArgs e)
@@ -275,7 +302,7 @@ namespace KamCapture.UI
             c.OpenEditorAfterCapture = ChkOpenEditor.IsChecked == true;
             c.AutoSave = ChkAutoSave.IsChecked == true;
             c.IncludeCursor = ChkCursor.IsChecked == true;
-            c.SaveFolder = TxtSaveFolder.Text.Trim();
+            c.SaveFolder = ChooseFolder(TxtSaveFolder, OutputFolder.DefaultCaptures());
 
             c.BorderColor = ColorUtil.ToHex(_borderColor.Color);
             c.BorderThickness = SldBorderThickness.Value;
@@ -294,7 +321,14 @@ namespace KamCapture.UI
             if (CmbFps.SelectedItem is Item { Value: int fps }) c.RecordFps = fps;
             c.RecordQuality = (int)Math.Round(SldQuality.Value);
             c.RecordCursor = ChkRecordCursor.IsChecked == true;
-            c.RecordFolder = TxtRecordFolder.Text.Trim();
+            c.RecordFolder = ChooseFolder(TxtRecordFolder, OutputFolder.DefaultRecordings());
+
+            // Keep confirmations only for folders still in use, so an old yes
+            // cannot silently apply to a folder picked again months later.
+            c.ConfirmedSyncedFolders = new List<string>();
+            foreach (var f in new[] { c.SaveFolder, c.RecordFolder })
+                if (OutputFolder.IsSynced(f) && AppSettings.Normalise(f) is { } key && _confirmed.Contains(key))
+                    c.ConfirmedSyncedFolders.Add(key);
             c.FfmpegPath = TxtFfmpeg.Text.Trim();
 
             c.HotkeysEnabled = ChkHotkeys.IsChecked == true;

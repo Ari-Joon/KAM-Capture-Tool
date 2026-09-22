@@ -178,22 +178,50 @@ namespace KamCapture.UI
             else { _recorder.Pause(); BtnPause.Content = "Resume"; }
         }
 
-        private void OnStop(object sender, RoutedEventArgs e)
+        private bool _stopping, _finished;
+
+        private void OnStop(object sender, RoutedEventArgs e) => RequestStop();
+
+        /// <summary>
+        /// Stop and save, the same as pressing Stop. Safe to call more than once,
+        /// and from the global shortcut as well as the button.
+        /// </summary>
+        public void RequestStop()
         {
+            if (_stopping) return;
+            _stopping = true;
             _ready = false;
             _tick.Stop();
             BtnStop.IsEnabled = false;
             BtnStop.Content = "Saving…";
             BtnPause.IsEnabled = false;
 
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                string? path = null;
-                try { path = _recorder.Stop(); }
-                catch { }
-                Stopped?.Invoke(path);
-                Close();
-            }), DispatcherPriority.Background);
+            // Let the button repaint as "Saving…" before ffmpeg is waited on.
+            Dispatcher.BeginInvoke(new Action(FinishStop), DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// Stop and save right now, blocking until the file is finished. Used on
+        /// exit: shutting down with ffmpeg mid-write leaves an MP4 with no index,
+        /// which most players refuse to open.
+        /// </summary>
+        public void StopNow()
+        {
+            _stopping = true;
+            _tick.Stop();
+            FinishStop();
+        }
+
+        private void FinishStop()
+        {
+            if (_finished) return;
+            _finished = true;
+
+            string? path = null;
+            try { path = _recorder.Stop(); }
+            catch { }
+            Stopped?.Invoke(path);
+            Close();
         }
 
         private void OnDragBar(object sender, MouseButtonEventArgs e)

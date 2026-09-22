@@ -15,6 +15,7 @@ namespace KamCapture.Services
     public static class SingleInstance
     {
         private const string PipeName = "KAM.CaptureTool.Instance";
+        private const string MutexName = @"Local\KAM.CaptureTool.SingleInstance";
         private static Mutex? _mutex;
 
         public static bool IsFirst { get; private set; }
@@ -24,7 +25,7 @@ namespace KamCapture.Services
 
         public static bool Claim()
         {
-            _mutex = new Mutex(true, @"Local\KAM.CaptureTool.SingleInstance", out bool created);
+            _mutex = new Mutex(true, MutexName, out bool created);
             IsFirst = created;
             if (created) StartListener();
             return created;
@@ -83,6 +84,38 @@ namespace KamCapture.Services
                     Thread.Sleep(500);
                 }
             }
+        }
+
+        /// <summary>True when another copy holds the single-instance lock.</summary>
+        public static bool IsAnotherCopyRunning()
+        {
+            if (IsFirst) return false;
+            try
+            {
+                using var existing = Mutex.OpenExisting(MutexName);
+                return true;
+            }
+            catch (WaitHandleCannotBeOpenedException) { return false; }
+            catch { return true; }
+        }
+
+        /// <summary>
+        /// Ask a running copy to close, and wait for it to go. Setup commands
+        /// need this: an uninstall handed over to the running copy would simply
+        /// open its window, and a running copy cannot be deleted anyway.
+        /// </summary>
+        public static bool AskRunningCopyToExit(TimeSpan timeout)
+        {
+            if (!IsAnotherCopyRunning()) return true;
+            HandOver(new[] { "--exit" });
+
+            var until = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < until)
+            {
+                if (!IsAnotherCopyRunning()) return true;
+                Thread.Sleep(100);
+            }
+            return false;
         }
 
         public static void Release()

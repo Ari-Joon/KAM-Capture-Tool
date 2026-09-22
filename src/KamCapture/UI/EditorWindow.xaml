@@ -62,6 +62,12 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <Button x:Name="BtnNewCapture" Style="{StaticResource BarButton}"
+                            Content="New capture" ToolTip="Take another capture — this one stays open  (Ctrl+N)"
+                            Click="OnNewCapture"/>
+
+                    <Border Style="{StaticResource Divider}"/>
+
                     <Button x:Name="BtnSave" Style="{StaticResource PrimaryButton}" Margin="0,0,6,0"
                             Padding="16,7" VerticalAlignment="Center"
                             Content="Save" ToolTip="Save a PNG to your captures folder  (Ctrl+S)" Click="OnSave"/>

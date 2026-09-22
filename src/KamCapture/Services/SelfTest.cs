@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
@@ -156,6 +157,323 @@ namespace KamCapture.Services
                 return 0;
             }
             catch (Exception ex) { return Fail(ex.ToString()); }
+        }
+
+        /// <summary>
+        /// The OneDrive rules: a folder Windows redirected into OneDrive is
+        /// moved back to local disk, but one the user explicitly confirmed is
+        /// honoured. Runs entirely in a scratch folder and never calls Save(),
+        /// so the real settings file and captures folder are not touched.
+        /// </summary>
+        public static int FolderTest()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "kam-foldertest-" + Guid.NewGuid().ToString("N")[..8]);
+            var failures = 0;
+            void Expect(bool ok, string what)
+            {
+                Say((ok ? "  ok    " : "  FAIL  ") + what);
+                if (!ok) failures++;
+            }
+
+            try
+            {
+                // "\OneDrive" anywhere in the path is enough for IsSynced.
+                var synced = Path.Combine(root, "OneDrive", "Pictures", "KAM");
+                var chosen = Path.Combine(root, "OneDrive", "Chosen");
+                var local = Path.Combine(root, "Local", "Screenshots");
+                Directory.CreateDirectory(synced);
+                Directory.CreateDirectory(chosen);
+                File.WriteAllText(Path.Combine(synced, "KAM-test.png"), "x");
+                File.WriteAllText(Path.Combine(chosen, "KAM-keep.png"), "x");
+
+                Expect(OutputFolder.IsSynced(synced), "a path inside OneDrive is recognised");
+                Expect(!OutputFolder.IsSynced(local), "a local path is not");
+
+                Say("redirected by Windows, never confirmed");
+                var moved = Settings.AppSettings.Relocate(synced, local, ".png", _ => false);
+                Expect(moved == local, "setting moves back to local disk");
+                Expect(File.Exists(Path.Combine(local, "KAM-test.png")), "the tool's own capture comes with it");
+                Expect(OutputFolder.Resolve(synced, OutputFolder.CapturesLeaf) != synced, "saving does not pick the synced folder");
+
+                Say("chosen and confirmed in Settings");
+                var cfg = new Settings.AppSettings();
+                cfg.ConfirmedSyncedFolders.Add(chosen);
+                Expect(cfg.IsChosen(chosen), "the confirmed folder is recognised");
+                Expect(cfg.IsChosen(chosen + Path.DirectorySeparatorChar), "…with or without a trailing slash");
+                Expect(!cfg.IsChosen(synced), "a different OneDrive folder is not covered by that yes");
+
+                var kept = Settings.AppSettings.Relocate(chosen, local, ".png", cfg.IsChosen);
+                Expect(kept == chosen, "setting is left alone at launch");
+                Expect(File.Exists(Path.Combine(chosen, "KAM-keep.png")), "its files are not moved");
+                Expect(OutputFolder.Resolve(chosen, OutputFolder.CapturesLeaf, honourPreferred: true) == chosen, "saving writes there");
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+            finally
+            {
+                try { Directory.Delete(root, recursive: true); } catch { }
+            }
+
+            if (failures > 0) return Fail(failures + " expectation(s) not met");
+            Say("folder-test OK");
+            return 0;
+        }
+
+        /// <summary>
+        /// Drive the real capture-result code, minus the interactive overlay,
+        /// and check the windows end up where they should. The bug this guards:
+        /// after one capture the home window never came back, so the only way
+        /// to take a second was to restart the application.
+        /// </summary>
+        public static int LifecycleTest()
+        {
+            var failures = new System.Collections.Generic.List<string>();
+            void Expect(bool ok, string what)
+            {
+                Say((ok ? "  ok    " : "  FAIL  ") + what);
+                if (!ok) failures.Add(what);
+            }
+
+            // Keep the clipboard and the captures folder out of it.
+            var cfg = new Settings.AppSettings
+            {
+                CopyToClipboardOnCapture = false,
+                AutoSave = false,
+                OpenEditorAfterCapture = true
+            };
+
+            UI.MainWindow? home = null;
+            try
+            {
+                home = new UI.MainWindow(cfg);
+                home.Show();
+                Pump(300);
+
+                Say("one capture, then close the annotator");
+                var first = CaptureOnce(cfg);
+                Expect(!home.IsVisible, "home steps aside while annotating");
+                Expect(first?.IsVisible == true, "annotator is open");
+
+                first?.Close();
+                Pump(300);
+                Expect(home.IsVisible, "home comes back when the annotator closes");
+
+                Say("capture from the home window, then again from the annotator");
+                var a = CaptureOnce(cfg);
+                var b = CaptureOnce(cfg);
+                Expect(a?.IsVisible == true, "first annotator is brought back, work intact");
+                Expect(b?.IsVisible == true, "second annotator is open");
+                Expect(!home.IsVisible, "home stays aside while any annotator is open");
+
+                b?.Close();
+                Pump(300);
+                Expect(!home.IsVisible, "closing one of two annotators leaves home aside");
+
+                a?.Close();
+                Pump(300);
+                Expect(home.IsVisible, "closing the last annotator brings home back");
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+            finally
+            {
+                foreach (var w in Application.Current.Windows.OfType<Window>().ToList())
+                    try { w.Close(); } catch { }
+            }
+
+            if (failures.Count > 0) return Fail(failures.Count + " expectation(s) not met");
+            Say("lifecycle-test OK");
+            return 0;
+        }
+
+        /// <summary>
+        /// What CaptureController.RunAsync does around the overlay: clear our
+        /// windows, then hand a finished selection to the result handling.
+        /// </summary>
+        private static UI.EditorWindow? CaptureOnce(Settings.AppSettings cfg)
+        {
+            var before = Application.Current.Windows.OfType<UI.EditorWindow>().ToHashSet();
+
+            var ours = Application.Current.Windows.OfType<Window>()
+                .Where(w => w is UI.MainWindow or UI.EditorWindow or UI.SettingsWindow)
+                .ToList();
+            var hidden = CaptureController.ClearTheGlass(ours);
+            CaptureController.ReleaseTheGlass(hidden);
+
+            var result = new Capture.CaptureResult
+            {
+                Action = Capture.CaptureAction.Edit,
+                Image = SampleCapture(),
+                Region = new Int32Rect(0, 0, 520, 300)
+            };
+
+            var task = CaptureController.HandleResultAsync(result, cfg, hidden);
+            while (!task.IsCompleted) Pump(20);
+            Pump(300);
+
+            return Application.Current.Windows.OfType<UI.EditorWindow>().FirstOrDefault(w => !before.Contains(w));
+        }
+
+        /// <summary>
+        /// Measure how much of one of our own windows survives into a desktop
+        /// grab taken straight after hiding it — the "ghost" that appeared in
+        /// captures. Each strategy is scored as the fraction of the window's
+        /// contrast that is still there: 0% means the grab shows exactly what
+        /// was behind the window, 100% means the window was captured whole.
+        /// </summary>
+        public static int GhostTest(int trials = 3)
+        {
+            try
+            {
+                var strategies = new (string Name, Action<Window> Hide)[]
+                {
+                    ("hide, wait 160 ms (as shipped)", w =>
+                    {
+                        w.Hide();
+                        Pump(160);
+                    }),
+                    ("exclude from capture only, still shown", w =>
+                    {
+                        Interop.WindowStyling.ExcludeFromCapture(w, true);
+                        Interop.NativeMethods.DwmFlush();
+                        Interop.NativeMethods.DwmFlush();
+                    }),
+                    ("hide, wait 2 frames, animation on", w =>
+                    {
+                        w.Hide();
+                        Interop.NativeMethods.DwmFlush();
+                        Interop.NativeMethods.DwmFlush();
+                    }),
+                    ("hide, wait 2 frames, animation off", w =>
+                    {
+                        Interop.WindowStyling.SetTransitionsDisabled(w, true);
+                        w.Hide();
+                        Interop.NativeMethods.DwmFlush();
+                        Interop.NativeMethods.DwmFlush();
+                    }),
+                    ("fixed: CaptureController.ClearTheGlass", w =>
+                    {
+                        CaptureController.ClearTheGlass(new[] { w });
+                    }),
+                };
+
+                Say($"{"strategy",-44}  worst ghost over {trials} trials");
+                bool fixedPasses = true;
+
+                foreach (var (name, hide) in strategies)
+                {
+                    double worst = 0;
+                    for (int t = 0; t < trials; t++)
+                    {
+                        double ghost = MeasureGhost(hide);
+                        if (double.IsNaN(ghost)) return Fail("test window never appeared on screen");
+                        worst = Math.Max(worst, ghost);
+                    }
+
+                    Say($"{name,-44}  {worst * 100,6:0.0}%");
+                    if (name.StartsWith("fixed") && worst > 0.02) fixedPasses = false;
+                }
+
+                if (!fixedPasses) return Fail("the fixed path still leaves a ghost above 2%");
+                Say("ghost-test OK");
+                return 0;
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+        }
+
+        private static double MeasureGhost(Action<Window> hide)
+        {
+            // Built like the home window — a normal title bar, activated, not
+            // topmost — because Windows only animates hiding for windows like
+            // that. A borderless test window vanishes instantly and proves
+            // nothing: every strategy scored 0% against one.
+            var area = SystemParameters.WorkArea;
+            var w = new Window
+            {
+                Title = "KAM ghost test",
+                WindowStyle = WindowStyle.SingleBorderWindow,
+                ResizeMode = ResizeMode.CanMinimize,
+                ShowInTaskbar = false,
+                ShowActivated = true,
+                // Topmost only so every trial is actually visible: a background
+                // process is not allowed to take the foreground more than once,
+                // and a window left behind another one measures nothing.
+                Topmost = true,
+                Width = 300,
+                Height = 200,
+                Left = area.Right - 324,
+                Top = area.Bottom - 224,
+                Background = new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0xFF))
+            };
+            Interop.WindowStyling.ApplyDarkChrome(w);
+
+            try
+            {
+                // First show only to learn where the window lands in device
+                // pixels; then take it away instantly to read the background.
+                w.Show();
+                w.Activate();
+                Pump(300);
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(w).Handle;
+                var (bx, by, bw, bh) = Capture.WindowFinder.GetWindowBounds(hwnd);
+                var rect = new Int32Rect(bx, by, bw, bh);
+
+                Interop.WindowStyling.SetTransitionsDisabled(w, true);
+                w.Hide();
+                Pump(250);
+                var behind = Grab(rect);
+
+                // Show it properly, fade and all, and let the fade finish.
+                Interop.WindowStyling.SetTransitionsDisabled(w, false);
+                w.Show();
+                w.Activate();
+                Pump(800);
+                var shown = Grab(rect);
+
+                hide(w);
+                var after = Grab(rect);
+
+                double full = MeanDifference(shown, behind);
+                if (full < 20) return double.NaN;
+                return Math.Clamp(MeanDifference(after, behind) / full, 0, 1);
+            }
+            finally
+            {
+                Interop.WindowStyling.ExcludeFromCapture(w, false);
+                w.Close();
+                Pump(150);
+            }
+        }
+
+        private static byte[] Grab(Int32Rect rect)
+        {
+            var snap = Capture.ScreenGrabber.CaptureVirtualDesktop();
+            var crop = new FormatConvertedBitmap(snap.Crop(rect), PixelFormats.Bgra32, null, 0);
+            var pixels = new byte[rect.Width * rect.Height * 4];
+            crop.CopyPixels(pixels, rect.Width * 4, 0);
+            return pixels;
+        }
+
+        private static double MeanDifference(byte[] a, byte[] b)
+        {
+            long sum = 0;
+            int n = Math.Min(a.Length, b.Length);
+            for (int i = 0; i < n; i += 4)
+                sum += Math.Abs(a[i] - b[i]) + Math.Abs(a[i + 1] - b[i + 1]) + Math.Abs(a[i + 2] - b[i + 2]);
+            return sum / (n / 4.0) / 3.0;
+        }
+
+        /// <summary>Let the dispatcher run for a while, so windows actually paint.</summary>
+        private static void Pump(int milliseconds)
+        {
+            var until = DateTime.UtcNow.AddMilliseconds(milliseconds);
+            while (DateTime.UtcNow < until)
+            {
+                var frame = new System.Windows.Threading.DispatcherFrame();
+                System.Windows.Threading.Dispatcher.CurrentDispatcher.BeginInvoke(
+                    System.Windows.Threading.DispatcherPriority.Background,
+                    new Action(() => frame.Continue = false));
+                System.Windows.Threading.Dispatcher.PushFrame(frame);
+                System.Threading.Thread.Sleep(5);
+            }
         }
 
         private static void Say(string message)

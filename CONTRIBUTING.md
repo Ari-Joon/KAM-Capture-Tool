@@ -45,7 +45,20 @@ all, and fails if the frame count is short of the wall clock. A correct run
 writes exactly `fps x seconds` frames. Check the result with ffprobe: the video
 duration should match the seconds you asked for, not be shorter.
 
-Screen capture and the selection overlay are not covered. They need a
+The rest need a desktop, and run on your machine rather than in CI:
+
+| Check | What it proves |
+|---|---|
+| `--ghosttest` | The tool's own windows leave nothing in a desktop grab. Scores each hiding strategy, and fails if the one in use leaks more than 2% |
+| `--lifecycletest` | After a capture, the home window and any open annotator come back where they should |
+| `--foldertest` | A OneDrive folder Windows chose is moved back to local disk; one you confirmed is left alone |
+
+Each was run once against the bug it guards, to watch it fail, before it was
+trusted to pass. Keep doing that for new checks: the first ghost test scored
+every strategy 0%, including the broken one, because its window had no title
+bar and Windows does not animate those. It passed and proved nothing.
+
+The selection overlay itself is still not covered. They need a
 desktop, a pointer and in one case a sound card. If you change them, say in the
 pull request what you did by hand to check them.
 

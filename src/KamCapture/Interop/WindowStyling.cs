@@ -47,6 +47,20 @@ namespace KamCapture.Interop
 
         private static int Bgr(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
 
+        /// <summary>
+        /// Switch off the compositor's show/hide animation for one window. With
+        /// it on, Hide() starts a fade that runs for several frames after the
+        /// call returns — long enough to be photographed half-transparent.
+        /// </summary>
+        public static void SetTransitionsDisabled(Window window, bool disabled)
+        {
+            var hwnd = new WindowInteropHelper(window).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            int value = disabled ? 1 : 0;
+            NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_TRANSITIONS_FORCEDISABLED,
+                ref value, sizeof(int));
+        }
+
         /// <summary>Hide a window from every screen capture on the machine, including our own.</summary>
         public static void ExcludeFromCapture(Window window, bool exclude = true)
         {

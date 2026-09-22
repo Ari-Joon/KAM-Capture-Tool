@@ -29,7 +29,16 @@ signed. *More info* then *Run anyway*.
 | `--uninstall --quiet` | The same without the confirmation |
 | `--no-tray` | Run without the notification-area icon |
 | `--selftest=<path>` | Render every annotation type to a PNG and exit (used by CI) |
+| `--foldertest` | Check the OneDrive rules in a scratch folder; touches nothing real |
+| `--lifecycletest` | Check windows come back after a capture; opens windows briefly |
+| `--ghosttest` | Measure how much of a hidden window leaks into a grab; flashes a window |
+| `--savetest` | Walk the Save path end to end and report where it breaks |
+| `--rectest=<file>,<seconds>` | Record a small region headlessly and check the frame count |
 | `--docshots=<dir>` | Render the windows to PNGs offscreen, for documentation |
+
+The checks run alongside a copy that is already in the tray. Setup commands
+(`--install-silent`, `--uninstall`) ask a running copy to close first, since an
+installed executable cannot be replaced or removed while it runs.
 
 ### Uninstalling
 
@@ -65,6 +74,9 @@ executable, or wherever you point it in Settings.
 | `Videos\KAM Capture Tool\Recordings` | Saved recordings, by default |
 
 Nothing is written anywhere else, and nothing is sent anywhere.
+
+Closing the last annotator brings the home window back, so the next capture is
+always one click away.
 
 Captures are kept on local disk on purpose. Windows' known-folder move often
 repoints Pictures into OneDrive, which would upload every screenshot you take;
@@ -153,6 +165,7 @@ the board, so neither can be lost off the edge.
 |---|---|
 | `Ctrl+S` | Save a PNG to the captures folder |
 | `Ctrl+Shift+C` | Copy the whole board to the clipboard |
+| `Ctrl+N` or **New capture** | Take another capture — this annotator stays open, work and all |
 | Export 1x–4x | Re-renders the annotations at that resolution |
 
 Export scale is worth understanding: the screenshot is a bitmap and gets no

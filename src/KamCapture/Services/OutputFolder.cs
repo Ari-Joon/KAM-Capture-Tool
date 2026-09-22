@@ -122,8 +122,13 @@ namespace KamCapture.Services
         /// sensible local alternatives; only considers a synced folder if
         /// nothing local works at all.
         /// </summary>
-        public static string Resolve(string preferred, string leaf)
+        public static string Resolve(string preferred, string leaf, bool honourPreferred = false)
         {
+            // Explicitly chosen and confirmed: use it if it works at all, even
+            // though it syncs. Falling back quietly would override a decision.
+            if (honourPreferred && !string.IsNullOrWhiteSpace(preferred) && IsUsable(preferred))
+                return preferred;
+
             var local = new List<string>();
             var synced = new List<string>();
 

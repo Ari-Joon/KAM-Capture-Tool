@@ -24,16 +24,6 @@ namespace KamCapture
             // Clear the copy displaced by the last update, whatever mode we run in.
             Installer.CleanUpPreviousVersion();
 
-            // One instance owns the global shortcuts. A second launch hands its
-            // arguments over and exits quietly rather than showing a dialog.
-            if (!SingleInstance.Claim())
-            {
-                SingleInstance.HandOver(e.Args);
-                Shutdown();
-                return;
-            }
-            SingleInstance.SecondInstance += OnSecondInstance;
-
             DispatcherUnhandledException += (_, args) =>
             {
                 Log.Error("Unhandled on the UI thread", args.Exception);
@@ -54,6 +44,10 @@ namespace KamCapture
                 args.SetObserved();
             };
 
+            // Diagnostics are headless and run alongside a copy that is already
+            // in the tray. They never touch the single-instance lock: if they did,
+            // a running copy would swallow them and they would exit reporting
+            // success without having run at all.
             // Headless smoke test: renders every annotation kind to a PNG and exits.
             var selfTest = e.Args.FirstOrDefault(a => a.StartsWith("--selftest", StringComparison.OrdinalIgnoreCase));
             if (selfTest != null)
@@ -62,6 +56,27 @@ namespace KamCapture
                     ? selfTest[(selfTest.IndexOf('=') + 1)..]
                     : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "kam-selftest.png");
                 Environment.ExitCode = SelfTest.Run(target);
+                Shutdown();
+                return;
+            }
+
+            if (e.Args.Any(a => a.Equals("--foldertest", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = SelfTest.FolderTest();
+                Shutdown();
+                return;
+            }
+
+            if (e.Args.Any(a => a.Equals("--lifecycletest", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = SelfTest.LifecycleTest();
+                Shutdown();
+                return;
+            }
+
+            if (e.Args.Any(a => a.Equals("--ghosttest", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = SelfTest.GhostTest();
                 Shutdown();
                 return;
             }
@@ -92,10 +107,35 @@ namespace KamCapture
                 return;
             }
 
+            // Setup commands must act even when a copy is running, so ask it to
+            // close rather than handing the command to it — handed over, an
+            // uninstall would simply open the running copy's window.
+            if (IsSetupCommand(e.Args))
+            {
+                if (!SingleInstance.AskRunningCopyToExit(TimeSpan.FromSeconds(10)))
+                {
+                    MessageBox.Show(
+                        "KAM Capture Tool is still running. Close it from the notification area and try again.",
+                        Installer.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+                    Shutdown();
+                    return;
+                }
+                if (HandleSetupArguments(e.Args)) return;
+            }
+
+            // One instance owns the global shortcuts. A second launch hands its
+            // arguments over and exits quietly rather than showing a dialog.
+            if (!SingleInstance.Claim())
+            {
+                SingleInstance.HandOver(e.Args);
+                Shutdown();
+                return;
+            }
+            SingleInstance.SecondInstance += OnSecondInstance;
+
             Log.Info("--- started (" + string.Join(" ", e.Args) + ")");
             _cfg = AppSettings.Load();
 
-            if (HandleSetupArguments(e.Args)) return;
             if (!OfferInstall(e.Args)) return;
 
             if (!e.Args.Any(a => a.Equals("--no-tray", StringComparison.OrdinalIgnoreCase)))
@@ -113,6 +153,10 @@ namespace KamCapture
             if (mode != null && Enum.TryParse<SnipMode>(mode["--capture=".Length..], true, out var m))
                 _ = CaptureController.RunAsync(m, _cfg);
         }
+
+        private static bool IsSetupCommand(string[] args) =>
+            args.Any(a => a.Equals("--uninstall", StringComparison.OrdinalIgnoreCase) ||
+                          a.Equals("--install-silent", StringComparison.OrdinalIgnoreCase));
 
         /// <summary>Uninstall and silent-install run without any main window.</summary>
         private bool HandleSetupArguments(string[] args)
@@ -182,6 +226,13 @@ namespace KamCapture
         /// <summary>Another copy was launched; do what it was asked to do.</summary>
         private static void OnSecondInstance(string[] args)
         {
+            // An installer or uninstaller needs this copy out of the way.
+            if (args.Any(a => a.Equals("--exit", StringComparison.OrdinalIgnoreCase)))
+            {
+                Quit();
+                return;
+            }
+
             var mode = args.FirstOrDefault(a => a.StartsWith("--capture=", StringComparison.OrdinalIgnoreCase));
             if (mode != null && Enum.TryParse<SnipMode>(mode["--capture=".Length..], true, out var m))
             {
@@ -309,7 +360,7 @@ namespace KamCapture
                     "A recording is still running. Stop it and exit?",
                     "KAM Capture Tool", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
                 if (answer != MessageBoxResult.OK) return;
-                RecordingController.StopActive();
+                RecordingController.StopActiveNow();
             }
             Current.Shutdown();
         }

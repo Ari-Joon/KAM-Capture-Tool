@@ -116,13 +116,11 @@ namespace KamCapture.Services
             }
         }
 
-        public static void StopActive()
-        {
-            _bar?.Dispatcher.BeginInvoke(new Action(() =>
-            {
-                try { _bar?.Activate(); } catch { }
-            }));
-        }
+        /// <summary>Stop the running recording and save it, as the Stop button does.</summary>
+        public static void StopActive() => _bar?.RequestStop();
+
+        /// <summary>Stop and finish writing the file before returning. For exit.</summary>
+        public static void StopActiveNow() => _bar?.StopNow();
 
         public static void RevealLast(string path)
         {

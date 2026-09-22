@@ -232,8 +232,16 @@ namespace KamCapture.Interop
         public const uint GA_ROOT = 2;
 
         // DWM: the real visible bounds, excluding the invisible resize border.
+        public const int DWMWA_TRANSITIONS_FORCEDISABLED = 3;
         public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
         public const int DWMWA_CLOAKED = 14;
+
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+
+        /// <summary>Blocks until the compositor has presented its next frame.</summary>
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmFlush();
 
         [DllImport("dwmapi.dll")]
         public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);

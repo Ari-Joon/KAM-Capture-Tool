@@ -1087,6 +1087,14 @@ namespace KamCapture.Editor
             _editingItem = null;
 
             Children.Remove(editor);
+
+            // A new text box already took its undo step when it was placed. An
+            // existing one being rewritten needs its own, taken before the text
+            // changes — without it the edit could not be undone, and emptying a
+            // text box deleted it for good.
+            if (!_editingIsNew && editor.Text != item.Text)
+                Undo.Push();
+
             item.Text = editor.Text;
 
             if (string.IsNullOrWhiteSpace(item.Text))

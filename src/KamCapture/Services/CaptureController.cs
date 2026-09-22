@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
 using KamCapture.Capture;
+using KamCapture.Interop;
 using KamCapture.Recording;
 using KamCapture.Settings;
 using KamCapture.UI;
@@ -30,19 +31,25 @@ namespace KamCapture.Services
             {
                 // Our own windows must be off the glass before the desktop is
                 // frozen, otherwise they end up in the picture.
-                foreach (Window w in Application.Current.Windows)
-                {
-                    if (w.IsVisible && w is MainWindow or EditorWindow or SettingsWindow)
-                    {
-                        hidden.Add(w);
-                        w.Hide();
-                    }
-                }
+                var ours = Application.Current.Windows.OfType<Window>()
+                    .Where(w => w is MainWindow or EditorWindow or SettingsWindow)
+                    .ToList();
+                hidden = ClearTheGlass(ours);
 
                 int delay = delayOverride ?? cfg.DelaySeconds;
-                await Task.Delay(Math.Max(0, delay) * 1000 + 160);
+                if (delay > 0) await Task.Delay(delay * 1000);
 
-                var snapshot = ScreenGrabber.CaptureVirtualDesktop(cfg.IncludeCursor);
+                DesktopSnapshot snapshot;
+                try
+                {
+                    snapshot = ScreenGrabber.CaptureVirtualDesktop(cfg.IncludeCursor);
+                }
+                finally
+                {
+                    // Exclusion only matters for the grab itself. Left on, it
+                    // would stop anyone screenshotting this tool with another.
+                    ReleaseTheGlass(hidden);
+                }
                 Log.Info($"Desktop frozen: {snapshot.Width} x {snapshot.Height} at ({snapshot.OriginX},{snapshot.OriginY})");
 
                 var result = CaptureOverlay.Run(mode, cfg, snapshot);
@@ -68,7 +75,7 @@ namespace KamCapture.Services
             }
         }
 
-        private static async Task HandleResultAsync(CaptureResult result, AppSettings cfg, List<Window> hidden)
+        internal static async Task HandleResultAsync(CaptureResult result, AppSettings cfg, List<Window> hidden)
         {
             var image = result.Image!;
 
@@ -105,16 +112,28 @@ namespace KamCapture.Services
             }
 
             bool openEditor = result.Action == CaptureAction.Edit && cfg.OpenEditorAfterCapture;
+            var home = hidden.OfType<MainWindow>().FirstOrDefault();
+
+            // Any annotator or settings window that was open is work in
+            // progress. Bring it straight back — previously a second capture
+            // left the first annotator hidden, unsaved annotations and all.
+            RestoreAll(hidden.Where(w => w is not MainWindow).ToList());
 
             if (openEditor)
             {
+                // The home window steps aside while you annotate, and comes back
+                // when the last annotator closes, so there is always a way to
+                // the next capture without restarting.
+                if (home != null) _parkedHome = home;
+
                 var editor = new EditorWindow(image, cfg);
+                editor.Closed += OnEditorClosed;
                 editor.Show();
                 editor.Activate();
             }
             else
             {
-                RestoreAll(hidden);
+                home?.Show();
             }
 
             var parts = new List<string>();
@@ -122,6 +141,65 @@ namespace KamCapture.Services
             if (saved && savedPath != null) parts.Add("saved to " + savedPath);
             if (parts.Count > 0)
                 Notified?.Invoke($"{image.PixelWidth} × {image.PixelHeight} — " + string.Join(", ", parts));
+        }
+
+        private static MainWindow? _parkedHome;
+
+        private static void OnEditorClosed(object? sender, EventArgs e)
+        {
+            if (_parkedHome == null) return;
+
+            bool anotherOpen = Application.Current.Windows.OfType<EditorWindow>()
+                .Any(w => w.IsVisible && !ReferenceEquals(w, sender));
+            if (anotherOpen) return;
+
+            var home = _parkedHome;
+            _parkedHome = null;
+            home.Show();
+            home.Activate();
+        }
+
+        /// <summary>
+        /// Take our own windows off the glass before the desktop is frozen, and
+        /// make sure they are really gone rather than merely on their way out.
+        ///
+        /// Hide() alone does not do it. The compositor fades a hidden window out
+        /// over several frames after the call returns, and the old fixed
+        /// 160 ms wait lost that race: measured with --ghosttest, 10–30% of the
+        /// home window was still in the grab, varying run to run — the faint ghost that turned up
+        /// in real captures. Waiting two presented frames with the fade still
+        /// on was worse, at 100%. Excluding the window from capture, or
+        /// switching its fade off, each brought it to 0% on its own; both are
+        /// applied, so one failing does not bring the ghost back.
+        /// </summary>
+        public static List<Window> ClearTheGlass(IEnumerable<Window> candidates)
+        {
+            var cleared = new List<Window>();
+            foreach (var w in candidates)
+            {
+                if (!w.IsVisible) continue;
+                WindowStyling.ExcludeFromCapture(w, true);
+                WindowStyling.SetTransitionsDisabled(w, true);
+                w.Hide();
+                cleared.Add(w);
+            }
+
+            if (cleared.Count > 0)
+            {
+                NativeMethods.DwmFlush();
+                NativeMethods.DwmFlush();
+            }
+            return cleared;
+        }
+
+        /// <summary>Undo <see cref="ClearTheGlass"/> once the desktop has been read.</summary>
+        public static void ReleaseTheGlass(IEnumerable<Window> windows)
+        {
+            foreach (var w in windows)
+            {
+                WindowStyling.ExcludeFromCapture(w, false);
+                WindowStyling.SetTransitionsDisabled(w, false);
+            }
         }
 
         private static void RestoreAll(List<Window> hidden)

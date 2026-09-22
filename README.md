@@ -171,12 +171,40 @@ the machine — including this recorder. It cannot film itself.
 
 ## The tool never appears in its own output
 
-Two different mechanisms, because there are two different problems.
+Three different mechanisms, because there are three different problems.
 
-For **stills**, the desktop is frozen *before* any overlay is shown. The
-selection UI is drawn on top of a still image of the desktop, so it is not merely
-hidden from the capture — it did not exist when the capture was taken. It is also
-why dragging a selection is perfectly smooth: nothing underneath is repainting.
+For **the selection overlay**, the desktop is frozen *before* the overlay is
+shown. The selection UI is drawn on top of a still image of the desktop, so it is
+not merely hidden from the capture — it did not exist when the capture was taken.
+It is also why dragging a selection is perfectly smooth: nothing underneath is
+repainting.
+
+For **the tool's own windows**, hiding them is not enough, and version 1.0 got
+this wrong. Windows fades a hidden window out over several frames *after*
+`Hide()` returns, and 1.0 waited a fixed 160 ms before reading the desktop. The
+fade won that race often enough for the home window to turn up as a faint ghost
+in real captures. Measured with `--ghosttest`, which hides a window and scores how
+much of it survives into the grab:
+
+| Strategy | Window left in the grab |
+|---|---|
+| Hide, wait 160 ms — what 1.0 did | **10–30%**, varying run to run |
+| Hide, wait two presented frames, fade on | 100% |
+| Exclude the window from capture | 0% |
+| Hide with the fade switched off, wait two frames | 0% |
+
+The spread in the first row is the point: it is a race, so the ghost comes and
+goes, which is exactly why it read as an occasional glitch. Either of the last
+two is enough on its own, and both are now applied, so if one
+stops working on some future build of Windows the other still holds. The second
+row is the instructive one: waiting for the compositor looks like the careful fix
+and is worse than doing nothing, because two frames in, the fade has barely
+started.
+
+The first version of that test measured 0% for everything, including the broken
+path — its window had no title bar, and Windows does not animate those. A test
+that cannot fail is not evidence, so every check added since has been run once
+against the bug it guards, to watch it fail, before being trusted to pass.
 
 For **recording**, the control bar is excluded from capture at the compositor
 level. The selection overlay only hides itself the same way *while a recording is
