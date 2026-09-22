@@ -262,6 +262,10 @@ and installs per-user — so it never asks for an administrator. It is also
 perfectly happy to be told *"just run it, don't install"* and stay wherever you
 left it.
 
+Running a newer download over an installed copy updates it where it is, and
+starts from the choices you already made — which shortcuts you kept, and
+whether it starts with Windows.
+
 Uninstalling is in Add or Remove Programs, or:
 
 ```powershell
@@ -305,7 +309,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.1. Everything described above is implemented and works.
+Version 1.1.1. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|

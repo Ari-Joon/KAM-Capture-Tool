@@ -88,6 +88,13 @@ namespace KamCapture
                 return;
             }
 
+            if (e.Args.Any(a => a.Equals("--installtest", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = SelfTest.InstallTest();
+                Shutdown();
+                return;
+            }
+
             var recTest = e.Args.FirstOrDefault(a => a.StartsWith("--rectest=", StringComparison.OrdinalIgnoreCase));
             if (recTest != null)
             {
@@ -184,7 +191,7 @@ namespace KamCapture
             {
                 try
                 {
-                    var exe = Installer.Install(new Installer.Options());
+                    var exe = Installer.Install(Installer.Unattended());
                     Log.Info("Silent install to " + exe);
                     Console.WriteLine(exe);
                 }

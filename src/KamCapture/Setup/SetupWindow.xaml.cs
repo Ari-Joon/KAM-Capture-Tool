@@ -32,6 +32,16 @@ namespace KamCapture.Setup
             LblStatus.Text = Installer.InstalledDir != null
                 ? "An existing installation was found at that location. Installing again will replace it."
                 : "";
+
+            // Installing over an existing copy is an update, so start from what
+            // that copy has now rather than from the first-install defaults.
+            if (Installer.InstalledDir != null)
+            {
+                var current = Installer.Unattended();
+                ChkDesktop.IsChecked = current.DesktopShortcut;
+                ChkStartMenu.IsChecked = current.StartMenuShortcut;
+                ChkStartup.IsChecked = current.StartWithWindows;
+            }
         }
 
         private void OnBrowse(object sender, RoutedEventArgs e)

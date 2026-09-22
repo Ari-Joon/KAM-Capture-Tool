@@ -24,7 +24,7 @@ signed. *More info* then *Run anyway*.
 | `--tray` | Start hidden in the notification area |
 | `--portable` | Skip the install prompt for this run |
 | `--capture=Region` | Take a capture immediately (`Region`, `Window`, `Monitor`, `FullScreen`) |
-| `--install-silent` | Install to the default location with shortcuts, no interface |
+| `--install-silent` | Install with no interface. Over an existing install it updates it in place, keeping its folder, the shortcuts still there, and start-with-Windows; otherwise the default folder with both shortcuts |
 | `--uninstall` | Remove shortcuts, registry entries and the install folder |
 | `--uninstall --quiet` | The same without the confirmation |
 | `--no-tray` | Run without the notification-area icon |
@@ -33,6 +33,7 @@ signed. *More info* then *Run anyway*.
 | `--lifecycletest` | Check windows come back after a capture; opens windows briefly |
 | `--ghosttest` | Measure how much of a hidden window leaks into a grab; flashes a window |
 | `--savetest` | Walk the Save path end to end and report where it breaks |
+| `--installtest` | Check install and update against a scratch registry key and folders; touches nothing real |
 | `--rectest=<file>,<seconds>` | Record a small region headlessly and check the frame count |
 | `--docshots=<dir>` | Render the windows to PNGs offscreen, for documentation |
 

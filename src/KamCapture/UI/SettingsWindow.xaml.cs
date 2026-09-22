@@ -154,7 +154,9 @@ namespace KamCapture.UI
             _hkFull.Hotkey = c.HotkeyFullScreen;
             _hkRecord.Hotkey = c.HotkeyRecord;
 
-            ChkStartup.IsChecked = c.RunAtStartup;
+            // The Run key itself, not the setting: the installer changes it
+            // without going through here.
+            ChkStartup.IsChecked = StartupRegistration.IsSet();
             ChkTray.IsChecked = c.StartMinimisedToTray;
 
             UpdateLabels();
@@ -338,11 +340,8 @@ namespace KamCapture.UI
             c.HotkeyRecord = _hkRecord.Hotkey;
 
             bool startup = ChkStartup.IsChecked == true;
-            if (startup != c.RunAtStartup)
-            {
-                c.RunAtStartup = startup;
-                StartupRegistration.Set(startup);
-            }
+            if (startup != StartupRegistration.IsSet()) StartupRegistration.Set(startup);
+            c.RunAtStartup = startup;
             c.StartMinimisedToTray = ChkTray.IsChecked == true;
 
             c.Save();

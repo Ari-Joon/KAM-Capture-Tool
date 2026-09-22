@@ -16,16 +16,34 @@ namespace KamCapture.Setup
         public const string ProductName = "KAM Capture Tool";
         public const string ExeName = "KamCapture.exe";
 
-        private const string RegRoot = @"Software\KAM\Capture Tool";
-        private const string UninstallRoot =
-            @"Software\Microsoft\Windows\CurrentVersion\Uninstall\KAMCaptureTool";
+        /// <summary>
+        /// Everywhere an install writes. The install check swaps in a scratch
+        /// copy, so it runs the real code without touching the real registry,
+        /// desktop, Start menu or install folder.
+        /// </summary>
+        internal sealed record Footprint(
+            string RegRoot, string UninstallRoot, string RunKey,
+            string DefaultTarget, string DesktopFolder, string StartMenuFolder)
+        {
+            public static readonly Footprint Real = new(
+                @"Software\KAM\Capture Tool",
+                @"Software\Microsoft\Windows\CurrentVersion\Uninstall\KAMCaptureTool",
+                @"Software\Microsoft\Windows\CurrentVersion\Run",
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Programs", ProductName),
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                Environment.GetFolderPath(Environment.SpecialFolder.Programs));
+        }
+
+        internal static Footprint Where { get; set; } = Footprint.Real;
+
+        private static string RegRoot => Where.RegRoot;
+        private static string UninstallRoot => Where.UninstallRoot;
 
         public static string Version =>
             System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
 
-        public static string DefaultTarget => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Programs", ProductName);
+        public static string DefaultTarget => Where.DefaultTarget;
 
         public static string CurrentExe => Environment.ProcessPath ?? "";
         public static string CurrentDir => Path.GetDirectoryName(CurrentExe) ?? "";
@@ -61,11 +79,9 @@ namespace KamCapture.Setup
             }
         }
 
-        public static string DesktopShortcut => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), ProductName + ".lnk");
+        public static string DesktopShortcut => Path.Combine(Where.DesktopFolder, ProductName + ".lnk");
 
-        public static string StartMenuShortcut => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.Programs), ProductName + ".lnk");
+        public static string StartMenuShortcut => Path.Combine(Where.StartMenuFolder, ProductName + ".lnk");
 
         // ------------------------------------------------------------
 
@@ -75,6 +91,26 @@ namespace KamCapture.Setup
             public bool DesktopShortcut { get; set; } = true;
             public bool StartMenuShortcut { get; set; } = true;
             public bool StartWithWindows { get; set; }
+        }
+
+        /// <summary>
+        /// The choices for an install nobody is watching. Over an existing
+        /// install that is an update: the same folder, only the shortcuts that
+        /// are still there, and start-with-Windows left as it was. With nothing
+        /// installed, the defaults.
+        /// </summary>
+        public static Options Unattended()
+        {
+            var existing = InstalledDir;
+            if (string.IsNullOrWhiteSpace(existing)) return new Options();
+
+            return new Options
+            {
+                TargetDir = existing,
+                DesktopShortcut = File.Exists(DesktopShortcut),
+                StartMenuShortcut = File.Exists(StartMenuShortcut),
+                StartWithWindows = Settings.StartupRegistration.IsSet()
+            };
         }
 
         /// <summary>
@@ -151,8 +187,10 @@ namespace KamCapture.Setup
                     "Capture, annotate and record the screen");
             }
 
+            // The installed copy, not this one: the installer is usually running
+            // from wherever it was downloaded to.
             progress?.Invoke("Start with Windows");
-            Settings.StartupRegistration.Set(options.StartWithWindows);
+            Settings.StartupRegistration.Set(options.StartWithWindows, targetExe);
 
             progress?.Invoke("Done");
             return targetExe;

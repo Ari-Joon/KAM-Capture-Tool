@@ -219,6 +219,109 @@ namespace KamCapture.Services
         }
 
         /// <summary>
+        /// Install and update: the real code, pointed at a scratch registry key
+        /// and scratch folders. The bugs this guards: ticking "Start with
+        /// Windows" registered the downloaded file instead of the installed
+        /// copy, and an unattended update moved the install to the default
+        /// folder, put back a shortcut that had been deleted, and switched
+        /// start-with-Windows off. Ends by checking the real install, its
+        /// shortcuts and its sign-in entry are exactly as they were.
+        /// </summary>
+        public static int InstallTest()
+        {
+            var id = Guid.NewGuid().ToString("N")[..8];
+            var root = Path.Combine(Path.GetTempPath(), "kam-installtest-" + id);
+            var regRoot = $@"Software\KAM\Capture Tool (install check {id})";
+            var real = Setup.Installer.Where;
+            var before = Snapshot(real);
+
+            var failures = 0;
+            void Expect(bool ok, string what)
+            {
+                Say((ok ? "  ok    " : "  FAIL  ") + what);
+                if (!ok) failures++;
+            }
+
+            try
+            {
+                Setup.Installer.Where = new Setup.Installer.Footprint(
+                    regRoot + @"\App", regRoot + @"\Uninstall", regRoot + @"\Run",
+                    Path.Combine(root, "Default", Setup.Installer.ProductName),
+                    Path.Combine(root, "Desktop"), Path.Combine(root, "Start Menu"));
+
+                var chosen = Path.Combine(root, "Chosen", Setup.Installer.ProductName);
+                string StartsAt() => Settings.StartupRegistration.Registered() ?? "nothing";
+
+                Say("first install, run from the download, start with Windows ticked");
+                var exe = Setup.Installer.Install(new Setup.Installer.Options { TargetDir = chosen, StartWithWindows = true });
+                var wanted = $"\"{exe}\" --tray";
+                Expect(!string.Equals(exe, Setup.Installer.CurrentExe, StringComparison.OrdinalIgnoreCase),
+                    "the installed copy is a different file from the download");
+                Expect(StartsAt() == wanted, "sign-in starts the installed copy" +
+                    (StartsAt() == wanted ? "" : " — it starts " + StartsAt()));
+                Expect(File.Exists(Setup.Installer.DesktopShortcut) && File.Exists(Setup.Installer.StartMenuShortcut),
+                    "both shortcuts are made");
+
+                Say("unattended update, after the desktop shortcut was deleted");
+                File.Delete(Setup.Installer.DesktopShortcut);
+                Setup.Installer.Install(Setup.Installer.Unattended());
+                Expect(Setup.Installer.InstalledDir == chosen, "it updates the install where it is");
+                Expect(!Directory.Exists(Setup.Installer.DefaultTarget), "nothing is put in the default folder");
+                Expect(!File.Exists(Setup.Installer.DesktopShortcut), "the deleted shortcut stays deleted");
+                Expect(File.Exists(Setup.Installer.StartMenuShortcut), "the Start menu entry is kept");
+                Expect(StartsAt() == wanted, "start with Windows stays on");
+
+                Say("unattended update, start with Windows off");
+                Settings.StartupRegistration.Set(false);
+                Setup.Installer.Install(Setup.Installer.Unattended());
+                Expect(!Settings.StartupRegistration.IsSet(), "it stays off");
+
+                Say("unattended install, nothing installed yet");
+                Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(Setup.Installer.Where.RegRoot, throwOnMissingSubKey: false);
+                var fresh = Setup.Installer.Unattended();
+                Expect(fresh.TargetDir == Setup.Installer.DefaultTarget && fresh.DesktopShortcut &&
+                       fresh.StartMenuShortcut && !fresh.StartWithWindows,
+                    "the defaults: default folder, both shortcuts, no sign-in entry");
+            }
+            catch (Exception ex) { Expect(false, ex.ToString()); }
+            finally
+            {
+                Setup.Installer.Where = real;
+                try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(regRoot, throwOnMissingSubKey: false); } catch { }
+                try { Directory.Delete(root, recursive: true); } catch { }
+            }
+
+            Expect(Snapshot(real) == before, "the real install, shortcuts and sign-in entry are untouched");
+
+            if (failures > 0) return Fail(failures + " expectation(s) not met");
+            Say("install-test OK");
+            return 0;
+        }
+
+        /// <summary>A fingerprint of an install, to prove a check left it alone.</summary>
+        private static string Snapshot(Setup.Installer.Footprint where)
+        {
+            string Value(string key, string name)
+            {
+                try
+                {
+                    using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(key);
+                    return k?.GetValue(name)?.ToString() ?? "-";
+                }
+                catch { return "?"; }
+            }
+
+            string Stamp(string file) => File.Exists(file) ? File.GetLastWriteTimeUtc(file).Ticks.ToString() : "-";
+
+            var link = Setup.Installer.ProductName + ".lnk";
+            return string.Join(" | ",
+                Value(where.RegRoot, "InstallPath"), Value(where.RegRoot, "Version"),
+                Value(where.UninstallRoot, "DisplayVersion"), Value(where.RunKey, "KAM Capture Tool"),
+                Stamp(Path.Combine(where.DesktopFolder, link)), Stamp(Path.Combine(where.StartMenuFolder, link)),
+                Stamp(Path.Combine(where.DefaultTarget, Setup.Installer.ExeName)));
+        }
+
+        /// <summary>
         /// Drive the real capture-result code, minus the interactive overlay,
         /// and check the windows end up where they should. The bug this guards:
         /// after one capture the home window never came back, so the only way
