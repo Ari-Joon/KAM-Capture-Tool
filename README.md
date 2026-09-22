@@ -279,7 +279,9 @@ left it.
 
 Running a newer download over an installed copy updates it where it is, and
 starts from the choices you already made — which shortcuts you kept, and
-whether it starts with Windows.
+whether it starts with Windows. Close the copy in the tray first (right-click,
+**Exit**): opened while an older copy is running, the download only brings
+that copy's window up.
 
 Uninstalling is in Add or Remove Programs, or:
 
