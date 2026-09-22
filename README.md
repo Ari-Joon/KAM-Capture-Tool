@@ -298,8 +298,8 @@ publishes the single-file executable to `dist/`, and can install it with
 Inside the annotator: `V` select · `P` pencil · `K` highlighter · `L` line ·
 `A` arrow · `R` rectangle · `O` ellipse · `T` text · `S` numbered marker ·
 `D` symbols · `X` redact · `C` crop · `H` pan.
-`Ctrl+G` group, `Ctrl+Shift+G` ungroup, `Ctrl+D` duplicate, wheel to zoom,
-space-drag to pan.
+`Ctrl+N` new capture (this one stays open), `Ctrl+G` group, `Ctrl+Shift+G`
+ungroup, `Ctrl+D` duplicate, wheel to zoom, space-drag to pan.
 
 Full reference in [docs/SETUP.md](docs/SETUP.md).
 
@@ -329,6 +329,10 @@ The honest gaps:
   capture modes turned out to be the right number; a fourth was clutter.
 - **The interactive editor has no automated tests.** Rendering, grouping and
   export are covered by `--selftest`, which runs in CI; mouse interaction is not.
+- **The live recording controls have not been used in anger.** The pipeline is
+  measured — `--rectest` writes exactly `fps × seconds` frames beside a
+  continuous audio track — but switching microphone mid-take and stopping from
+  the shortcut have only been reasoned about, not exercised end to end.
 - **Unsigned.** SmartScreen will warn on first run until it has seen enough
   downloads. Signing needs a certificate this does not have.
 
