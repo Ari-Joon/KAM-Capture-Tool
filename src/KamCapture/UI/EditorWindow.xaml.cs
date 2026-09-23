@@ -233,7 +233,7 @@ namespace KamCapture.UI
 
             var tool = _surface.Tool;
 
-            Show(GrpColour, tool is not (EditTool.Select or EditTool.Pan or EditTool.Crop));
+            Show(GrpColour, tool is not (EditTool.Select or EditTool.MoveImage or EditTool.Crop));
             Show(GrpThickness, tool is EditTool.Pencil or EditTool.Highlighter or EditTool.Line
                 or EditTool.Arrow or EditTool.Rectangle or EditTool.Ellipse or EditTool.Symbol);
             Show(GrpFont, tool is EditTool.Text or EditTool.Step);
@@ -241,15 +241,18 @@ namespace KamCapture.UI
             Show(GrpStep, tool is EditTool.Step);
             Show(GrpSymbol, tool is EditTool.Symbol);
             Show(GrpRedact, tool is EditTool.Redact);
-            Show(GrpHint, tool is EditTool.Select or EditTool.Pan or EditTool.Crop);
+            Show(GrpHint, tool is EditTool.Select or EditTool.MoveImage or EditTool.Crop);
 
             LblToolHint.Text = tool switch
             {
-                EditTool.Select => "Drag across empty board to marquee-select · click the screenshot to pick it up · Ctrl+G groups · corner handles scale",
-                EditTool.Pan => "Drag to move the board. Wheel zooms.",
+                EditTool.Select => "Drag empty board to marquee-select  ·  M moves the screenshot  ·  Ctrl+G groups  ·  corner handles scale",
+                EditTool.MoveImage => "Drag to move the screenshot around the board  ·  hold Space to pan the view  ·  wheel zooms",
                 EditTool.Crop => "Drag a rectangle over the screenshot to crop it.",
                 _ => ""
             };
+
+            // The swatch follows the tool, since each remembers its own colour.
+            _inkColor.Color = ColorUtil.Parse(_surface.Options.Color);
 
             LblThickness.Text = ((int)Math.Round(SldThickness.Value)).ToString();
             LblNextStep.Text = "Next: " + StepItem.LabelFor(_surface.Options.StepStyle,
@@ -479,9 +482,23 @@ namespace KamCapture.UI
             try
             {
                 var folder = _cfg.EnsureSaveFolder();
-                var path = Path.Combine(folder, _cfg.BuildFileName(".png"));
+                var suggested = Path.GetFileNameWithoutExtension(_cfg.BuildFileName(".png"));
+
+                string path;
+                if (_cfg.AskNameOnSave)
+                {
+                    var ask = new NameDialog(suggested, folder) { Owner = this };
+                    if (ask.ShowDialog() != true) return;
+                    path = ask.ChosenPath;
+                }
+                else
+                {
+                    path = NameDialog.UniquePath(Path.Combine(folder, suggested + ".png"));
+                }
+
                 SaveTo(path, Flatten());
                 _lastSavedPath = path;
+                _cfg.NoteOutput(recording: false);
                 Flash("Saved to " + path);
             }
             catch (Exception ex)
@@ -507,6 +524,7 @@ namespace KamCapture.UI
             {
                 SaveTo(dlg.FileName, Flatten());
                 _lastSavedPath = dlg.FileName;
+                _cfg.NoteOutput(recording: false);
                 Flash("Saved to " + dlg.FileName);
             }
             catch (Exception ex)
@@ -602,7 +620,7 @@ namespace KamCapture.UI
                 case Key.Escape: _surface.ClearSelection(); e.Handled = true; break;
 
                 case Key.V: SelectTool(EditTool.Select); e.Handled = true; break;
-                case Key.H: SelectTool(EditTool.Pan); e.Handled = true; break;
+                case Key.M: SelectTool(EditTool.MoveImage); e.Handled = true; break;
                 case Key.P: SelectTool(EditTool.Pencil); e.Handled = true; break;
                 case Key.K: SelectTool(EditTool.Highlighter); e.Handled = true; break;
                 case Key.L: SelectTool(EditTool.Line); e.Handled = true; break;

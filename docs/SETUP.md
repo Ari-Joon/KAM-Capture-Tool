@@ -160,7 +160,7 @@ After releasing the mouse a small bar appears: **Annotate**, **Copy**, **Save**,
 | | | | |
 |---|---|---|---|
 | `V` | Select | `S` | Numbered marker |
-| `H` | Pan | `D` | Symbols |
+| `M` | Move the screenshot | `D` | Symbols |
 | `P` | Pencil | `X` | Redact |
 | `K` | Highlighter | `C` | Crop |
 | `L` | Line | `T` | Text |
@@ -188,7 +188,7 @@ After releasing the mouse a small bar appears: **Annotate**, **Copy**, **Save**,
 | | |
 |---|---|
 | Wheel | Zoom around the pointer |
-| Middle-drag, or hold `Space` and drag | Pan |
+| Middle-drag, or hold `Space` and drag | Pan the view |
 | `Ctrl+0` | Fit the board |
 | `Ctrl+1` | 100% |
 

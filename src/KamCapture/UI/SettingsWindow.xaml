@@ -61,6 +61,7 @@
                                 <CheckBox x:Name="ChkClipboard" Content="Copy to the clipboard" Margin="0,0,0,8"/>
                                 <CheckBox x:Name="ChkOpenEditor" Content="Open the annotator" Margin="0,0,0,8"/>
                                 <CheckBox x:Name="ChkAutoSave" Content="Save a PNG straight away" Margin="0,0,0,8"/>
+                                <CheckBox x:Name="ChkAskName" Content="Ask what to call it when saving" Margin="0,0,0,8"/>
                                 <CheckBox x:Name="ChkCursor" Content="Include the mouse cursor"/>
                             </StackPanel>
                         </StackPanel>

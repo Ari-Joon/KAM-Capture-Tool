@@ -33,6 +33,9 @@ namespace KamCapture.Settings
         public string SaveFolder { get; set; } = "";
         public string FileNameTemplate { get; set; } = "KAM-{date}-{time}";
 
+        /// <summary>Ask what to call a capture when Save is pressed.</summary>
+        public bool AskNameOnSave { get; set; } = true;
+
         // ---- Editor ----
         public double BoardMargin { get; set; } = 260;
         public string BoardBackground { get; set; } = "#F4F4F2";
@@ -170,6 +173,23 @@ namespace KamCapture.Settings
         /// remembers it, so a capture is never lost to a folder problem and
         /// never quietly turned into an upload.
         /// </summary>
+        /// <summary>
+        /// True when the last thing produced was a recording. "Open folder"
+        /// follows it, so finishing a video does not drop you in Screenshots.
+        /// </summary>
+        public bool LastOutputWasRecording { get; set; }
+
+        public void NoteOutput(bool recording)
+        {
+            if (LastOutputWasRecording == recording) return;
+            LastOutputWasRecording = recording;
+            Save();
+        }
+
+        /// <summary>The folder matching whatever was produced last.</summary>
+        public string EnsureLastOutputFolder() =>
+            LastOutputWasRecording ? EnsureRecordFolder() : EnsureSaveFolder();
+
         public string EnsureSaveFolder() =>
             Remember(Services.OutputFolder.Resolve(SaveFolder, Services.OutputFolder.CapturesLeaf, IsChosen(SaveFolder)),
                      SaveFolder, v => SaveFolder = v, "Capture");

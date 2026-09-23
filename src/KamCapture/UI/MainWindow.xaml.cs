@@ -194,7 +194,7 @@ namespace KamCapture.UI
         {
             try
             {
-                var folder = _cfg.EnsureSaveFolder();
+                var folder = _cfg.EnsureLastOutputFolder();
                 Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
             }
             catch (Exception ex) { Say("Could not open the folder: " + ex.Message); }

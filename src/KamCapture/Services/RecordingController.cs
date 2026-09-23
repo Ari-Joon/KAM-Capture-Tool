@@ -98,6 +98,9 @@ namespace KamCapture.Services
 
         private static void OnBarStopped(string? path)
         {
+            // The next "Open folder" should land in Recordings, not Screenshots.
+            AppSettings.Current.NoteOutput(recording: true);
+
             var recorder = _active;
             _active = null;
             _bar = null;

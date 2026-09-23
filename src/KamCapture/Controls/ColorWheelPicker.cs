@@ -7,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using KamCapture.Editor;
 
 namespace KamCapture.Controls
@@ -423,6 +424,17 @@ namespace KamCapture.Controls
 
         public bool ShowAlpha { get; set; }
 
+        /// <summary>The colours worth reaching for without opening anything.</summary>
+        private static readonly string[] QuickColours =
+        {
+            "#000000", "#FFFFFF", "#E5342A", "#FF8A00", "#FFD400",
+            "#2BB673", "#00A6C0", "#2E6BE6", "#7A5CFF", "#FF4FA3"
+        };
+
+        private Popup? _quick;
+        private DispatcherTimer? _hoverIn;
+        private DispatcherTimer? _hoverOut;
+
         public ColorButton()
         {
             Width = 34; Height = 30;
@@ -437,10 +449,95 @@ namespace KamCapture.Controls
             };
             Content = _chip;
             Click += (_, _) => Toggle();
+
+            // Hover gives the common colours straight away; clicking opens the
+            // wheel. The quick strip covers nine times out of ten without
+            // making the full picker any harder to reach.
+            MouseEnter += (_, _) => ScheduleQuick(true);
+            MouseLeave += (_, _) => ScheduleQuick(false);
+        }
+
+        private void ScheduleQuick(bool show)
+        {
+            _hoverIn ??= NewTimer(180, () => { if (IsMouseOver && _popup is not { IsOpen: true }) ShowQuick(); });
+            _hoverOut ??= NewTimer(260, () =>
+            {
+                if (IsMouseOver) return;
+                if (_quick is { IsOpen: true } && _quick.Child.IsMouseOver) return;
+                if (_quick != null) _quick.IsOpen = false;
+            });
+
+            _hoverIn.Stop();
+            _hoverOut.Stop();
+            (show ? _hoverIn : _hoverOut).Start();
+        }
+
+        private static DispatcherTimer NewTimer(int ms, Action tick)
+        {
+            var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+            t.Tick += (_, _) => { t.Stop(); tick(); };
+            return t;
+        }
+
+        private void ShowQuick()
+        {
+            if (_quick == null)
+            {
+                var strip = new WrapPanel { MaxWidth = 156, Margin = new Thickness(6) };
+                foreach (var hex in QuickColours)
+                {
+                    var colour = ColorUtil.Parse(hex);
+                    var cell = new Border
+                    {
+                        Width = 24, Height = 24, Margin = new Thickness(2),
+                        CornerRadius = new CornerRadius(4),
+                        Background = new SolidColorBrush(colour),
+                        BorderThickness = new Thickness(1),
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x42)),
+                        Cursor = Cursors.Hand,
+                        ToolTip = hex
+                    };
+                    cell.MouseEnter += (_, _) =>
+                        cell.BorderBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0xA9, 0x3A));
+                    cell.MouseLeave += (_, _) =>
+                        cell.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x3A, 0x42));
+                    cell.MouseLeftButtonUp += (_, _) =>
+                    {
+                        Color = colour;
+                        ColorChanged?.Invoke(colour);
+                        if (_quick != null) _quick.IsOpen = false;
+                    };
+                    strip.Children.Add(cell);
+                }
+
+                var shell = new Border
+                {
+                    Background = (Brush)(Application.Current.TryFindResource("Panel") ?? Brushes.DimGray),
+                    BorderBrush = (Brush)(Application.Current.TryFindResource("Edge") ?? Brushes.Gray),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(7),
+                    Child = strip,
+                    Effect = new System.Windows.Media.Effects.DropShadowEffect
+                    { BlurRadius = 14, ShadowDepth = 3, Opacity = 0.45, Color = Colors.Black }
+                };
+                shell.MouseLeave += (_, _) => ScheduleQuick(false);
+
+                _quick = new Popup
+                {
+                    Placement = PlacementMode.Bottom,
+                    PlacementTarget = this,
+                    StaysOpen = true,
+                    AllowsTransparency = true,
+                    PopupAnimation = PopupAnimation.Fade,
+                    Child = shell
+                };
+            }
+            _quick.IsOpen = true;
         }
 
         private void Toggle()
         {
+            if (_quick != null) _quick.IsOpen = false;
             if (_popup is { IsOpen: true }) { _popup.IsOpen = false; return; }
 
             _picker ??= new ColorWheelPicker();

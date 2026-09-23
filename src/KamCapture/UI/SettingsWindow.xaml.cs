@@ -127,6 +127,7 @@ namespace KamCapture.UI
             ChkClipboard.IsChecked = c.CopyToClipboardOnCapture;
             ChkOpenEditor.IsChecked = c.OpenEditorAfterCapture;
             ChkAutoSave.IsChecked = c.AutoSave;
+            ChkAskName.IsChecked = c.AskNameOnSave;
             ChkCursor.IsChecked = c.IncludeCursor;
             TxtSaveFolder.Text = c.SaveFolder;
 
@@ -305,6 +306,7 @@ namespace KamCapture.UI
             c.CopyToClipboardOnCapture = ChkClipboard.IsChecked == true;
             c.OpenEditorAfterCapture = ChkOpenEditor.IsChecked == true;
             c.AutoSave = ChkAutoSave.IsChecked == true;
+            c.AskNameOnSave = ChkAskName.IsChecked == true;
             c.IncludeCursor = ChkCursor.IsChecked == true;
             c.SaveFolder = ChooseFolder(TxtSaveFolder, OutputFolder.DefaultCaptures());
 

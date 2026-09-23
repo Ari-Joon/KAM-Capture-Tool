@@ -10,11 +10,34 @@ using System.Windows.Media.Imaging;
 
 namespace KamCapture.Editor
 {
-    public enum EditTool { Select, Pan, Pencil, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Step, Symbol, Redact, Crop }
+    public enum EditTool { Select, MoveImage, Pencil, Highlighter, Line, Arrow, Rectangle, Ellipse, Text, Step, Symbol, Redact, Crop }
 
     public sealed class ToolOptions
     {
         public string Color { get; set; } = "#E5342A";
+
+        /// <summary>
+        /// Each tool remembers the colour it was last used with. Writing is
+        /// black by default because that is what reads on a screenshot of a
+        /// light interface; drawing stays red, because a mark has to stand out
+        /// against whatever is underneath it.
+        /// </summary>
+        private readonly Dictionary<EditTool, string> _perTool = new()
+        {
+            { EditTool.Text, "#000000" }
+        };
+
+        public string ColorFor(EditTool tool) =>
+            _perTool.TryGetValue(tool, out var c) ? c : Color;
+
+        public void RememberColor(EditTool tool) => _perTool[tool] = Color;
+
+        /// <summary>Carry the colour across a tool change, per tool.</summary>
+        public void SwitchTool(EditTool from, EditTool to)
+        {
+            _perTool[from] = Color;
+            Color = ColorFor(to);
+        }
         public double Thickness { get; set; } = 3;
         public double FontSize { get; set; } = 18;
 
@@ -73,6 +96,7 @@ namespace KamCapture.Editor
             {
                 if (_tool == value) return;
                 CommitTextEdit();
+                Options.SwitchTool(_tool, value);
                 _tool = value;
                 if (value != EditTool.Select) ClearSelection();
                 UpdateCursor();
@@ -418,8 +442,10 @@ namespace KamCapture.Editor
             var screen = e.GetPosition(this);
             var board = ToBoard(screen);
 
+            // Panning the view is middle-drag or space-drag. The move tool is
+            // for the screenshot itself, which is what its icon promises.
             if (e.ChangedButton == MouseButton.Middle ||
-                (e.ChangedButton == MouseButton.Left && (_tool == EditTool.Pan || _spaceHeld)))
+                (e.ChangedButton == MouseButton.Left && _spaceHeld))
             {
                 _panning = true;
                 _panStart = screen;
@@ -433,6 +459,19 @@ namespace KamCapture.Editor
             if (e.ChangedButton != MouseButton.Left) return;
 
             CommitTextEdit();
+
+            if (_tool == EditTool.MoveImage)
+            {
+                if (Doc.Image != null)
+                {
+                    _movingImage = true;
+                    _moveLast = board;
+                    _movedSomething = false;
+                    CaptureMouse();
+                }
+                e.Handled = true;
+                return;
+            }
 
             if (_tool == EditTool.Select)
             {
@@ -1153,7 +1192,8 @@ namespace KamCapture.Editor
 
         private void UpdateCursor(Point? screen, Point? board)
         {
-            if (_panning || _spaceHeld || _tool == EditTool.Pan) { Cursor = Cursors.ScrollAll; return; }
+            if (_panning || _spaceHeld) { Cursor = Cursors.ScrollAll; return; }
+            if (_tool == EditTool.MoveImage) { Cursor = Cursors.SizeAll; return; }
 
             if (_tool == EditTool.Select)
             {
