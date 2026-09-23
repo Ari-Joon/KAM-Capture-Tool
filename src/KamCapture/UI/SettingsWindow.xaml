@@ -212,7 +212,7 @@
                         <StackPanel Style="{StaticResource Row}" Margin="0">
                             <TextBlock Style="{StaticResource RowLabel}" Text="Updates"/>
                             <CheckBox x:Name="ChkUpdates" Content="Check GitHub for new versions" Margin="0,0,20,0"
-                                      ToolTip="One request to GitHub a few seconds after start and every six hours. Nothing about you or your captures is sent."/>
+                                      ToolTip="One request to GitHub when KAM Capture Tool starts, and not again until the next start. Nothing about you or your captures is sent."/>
                             <TextBlock x:Name="LblVersion" Style="{StaticResource Label}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </StackPanel>

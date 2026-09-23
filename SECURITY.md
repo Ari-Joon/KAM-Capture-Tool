@@ -5,8 +5,8 @@
 KAM Capture Tool reads the screen, reads audio devices while recording, writes
 files, and asks GitHub whether there is a newer version. That is the whole list.
 
-- **One network request, and it can be switched off.** A few seconds after it
-  starts and every six hours after that, it asks
+- **One network request, and it can be switched off.** Once, a few seconds after
+  it starts, and not again until the next start, it asks
   `api.github.com/repos/Ari-Joon/KAM-Capture-Tool/releases/latest` which
   version is newest. The request carries the tool's version in its user agent
   and nothing else — no account, no identifier, nothing about your captures.

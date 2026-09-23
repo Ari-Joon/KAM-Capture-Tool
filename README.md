@@ -314,8 +314,10 @@ publishes the single-file executable to `dist/`, and can install it with
 </p>
 
 The circular arrow at the top right of the home window checks for a newer
-version, and it checks by itself as well — a few seconds after starting, then
-every six hours. When there is one, the arrow becomes a gold **Update to x.y.z**
+version, and it checks by itself as well — once, a few seconds after starting,
+and not again until the next start, so a program that sits in the tray all day
+is not going back to the network all day. When there is one, the arrow becomes
+a gold **Update to x.y.z**
 button and a bar says what changed, with **What's new**, **Not now** and
 **Update now**. If the window is closed, a tray notice says it once.
 
@@ -352,7 +354,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.2.0. Everything described above is implemented and works.
+Version 1.2.1. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|

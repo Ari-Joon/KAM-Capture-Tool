@@ -59,8 +59,9 @@ them too.
 ## Updates
 
 The circular arrow at the top right of the home window checks GitHub for a newer
-release. The tool also checks by itself, a few seconds after starting and every
-six hours. When there is one:
+release. The tool also checks by itself, once, a few seconds after starting, and
+not again until it is started again; if Windows started it before the network
+was up, that one check waits for the connection. When there is one:
 
 | Where | What you see |
 |---|---|

@@ -1,5 +1,6 @@
 using System;
 using System.Net.Http;
+using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Threading;
@@ -9,10 +10,10 @@ using KamCapture.Settings;
 namespace KamCapture.Setup
 {
     /// <summary>
-    /// When to ask, and what the answer was. Checks a few seconds after start
-    /// and every six hours after that, as the rest of the KAM family does;
-    /// holds the result for the home window, the tray and Settings; and runs
-    /// the download and hand-over when the user says yes.
+    /// When to ask, and what the answer was. Asks once per start, a few seconds
+    /// in, as every KAM tool does; holds the result for the home window, the
+    /// tray and Settings; and runs the download and hand-over when the user
+    /// says yes.
     /// </summary>
     public static class UpdateService
     {
@@ -32,33 +33,53 @@ namespace KamCapture.Setup
         public static event Action? Changed;
 
         private static readonly TimeSpan FirstCheck = TimeSpan.FromSeconds(5);
-        private static readonly TimeSpan Every = TimeSpan.FromHours(6);
-        private static readonly TimeSpan Retry = TimeSpan.FromMinutes(30);
 
         /// <summary>How long the old copy waits to be closed by the new one before saying so.</summary>
         private static readonly TimeSpan HandOverLimit = TimeSpan.FromSeconds(60);
 
         private static AppSettings? _cfg;
-        private static DispatcherTimer? _timer;
         private static CancellationTokenSource? _download;
 
+        /// <summary>
+        /// One automatic check per start, and never again until the next one: an
+        /// update matters, but not enough for a tray program to keep going back to
+        /// the network all day. It often starts with Windows, before the network
+        /// is up, so a check that finds no connection waits for one to arrive and
+        /// then asks - once. The update button still asks whenever it is clicked.
+        /// </summary>
         public static void Start(AppSettings cfg)
         {
             _cfg = cfg;
-            _timer = new DispatcherTimer { Interval = FirstCheck };
-            _timer.Tick += async (_, _) =>
+            if (!cfg.CheckForUpdates) return;
+
+            var first = new DispatcherTimer { Interval = FirstCheck };
+            first.Tick += async (_, _) =>
             {
-                _timer.Stop();
-                bool reached = !_cfg.CheckForUpdates || await CheckAsync(manual: false);
-                _timer.Interval = reached ? Every : Retry;
-                _timer.Start();
+                first.Stop();
+                if (!await CheckAsync(manual: false) && !NetworkInterface.GetIsNetworkAvailable())
+                    AskWhenConnected();
             };
-            _timer.Start();
+            first.Start();
+        }
+
+        private static void AskWhenConnected()
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null) return;
+
+            NetworkAvailabilityChangedEventHandler? handler = null;
+            handler = (_, e) =>
+            {
+                if (!e.IsAvailable) return;
+                NetworkChange.NetworkAvailabilityChanged -= handler;
+                dispatcher.BeginInvoke(new Action(() => _ = CheckAsync(manual: false)));
+            };
+            NetworkChange.NetworkAvailabilityChanged += handler;
         }
 
         /// <summary>
-        /// Ask GitHub. Automatic checks fail quietly and try again later;
-        /// a check the user asked for says what happened either way.
+        /// Ask GitHub. The automatic check fails quietly; a check the user
+        /// asked for says what happened either way.
         /// Returns true when GitHub answered, whatever it said.
         /// </summary>
         public static async Task<bool> CheckAsync(bool manual)
