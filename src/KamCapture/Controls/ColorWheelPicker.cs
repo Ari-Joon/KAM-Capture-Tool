@@ -57,33 +57,36 @@ namespace KamCapture.Controls
 
             var root = new StackPanel { Margin = new Thickness(12) };
 
+            // Build all three first. Each handler reads the other two, and
+            // wiring them before the fields exist is what the nullable warnings
+            // were pointing at — harmless at run time, but only because the
+            // handlers cannot fire during construction.
             _wheel = new WheelSurface { Width = 190, Height = 190, HorizontalAlignment = HorizontalAlignment.Center };
-            _wheel.Picked += (h, s) =>
-            {
-                var c = FromHsv(h, s, _value.Value, (byte)_alpha.Value);
-                SetColorInternal(c, fromWheel: true);
-            };
-            root.Children.Add(_wheel);
-
-            root.Children.Add(MakeLabel("Brightness"));
             _value = MakeSlider(0, 1, 1);
+            _alpha = MakeSlider(0, 255, 255);
+            _alpha.Visibility = Visibility.Collapsed;
+
+            _wheel.Picked += (h, s) =>
+                SetColorInternal(FromHsv(h, s, _value.Value, (byte)_alpha.Value), fromWheel: true);
+
             _value.ValueChanged += (_, _) =>
             {
                 if (_suppress) return;
                 _wheel.Value = _value.Value;
                 SetColorInternal(FromHsv(_wheel.Hue, _wheel.Sat, _value.Value, (byte)_alpha.Value), true);
             };
-            root.Children.Add(_value);
 
-            root.Children.Add(MakeLabel("Opacity"));
-            _alpha = MakeSlider(0, 255, 255);
             _alpha.ValueChanged += (_, _) =>
             {
                 if (_suppress) return;
                 SetColorInternal(FromHsv(_wheel.Hue, _wheel.Sat, _value.Value, (byte)_alpha.Value), true);
             };
+
+            root.Children.Add(_wheel);
+            root.Children.Add(MakeLabel("Brightness"));
+            root.Children.Add(_value);
+            root.Children.Add(MakeLabel("Opacity"));
             root.Children.Add(_alpha);
-            _alpha.Visibility = Visibility.Collapsed;
 
             var row = new Grid { Margin = new Thickness(0, 10, 0, 0) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });

@@ -25,6 +25,20 @@
 
     <sys:Double x:Key="Radius">6</sys:Double>
 
+    <!--
+      Motion vocabulary. Four durations, one easing, two properties.
+
+        press    90ms   opacity, plus a 2% scale down
+        release 120ms   back to rest
+        hover   140ms   an overlay faded in, never a colour swapped
+        state   140ms   checked and selected, the same fade
+
+      Only Opacity and RenderTransform are ever animated. Both compose on the
+      render thread and cost nothing measurable. Animating Width, Height or
+      Margin would force a layout pass every frame, which is where a smooth
+      interface turns into a janky one. Nothing here animates layout.
+    -->
+
     <!-- ===================== Button ===================== -->
     <Style TargetType="Button" x:Key="GhostButton">
         <Setter Property="Background" Value="{StaticResource PanelHi}"/>
@@ -39,22 +53,26 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="b" Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="6" Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    <Grid x:Name="root" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="squash" ScaleX="1" ScaleY="1"/>
+                        </Grid.RenderTransform>
+                        <Border x:Name="b" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"/>
+                        <Border x:Name="hover" Background="#FF26262C" BorderBrush="#FF3A3A42"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"
+                                Opacity="0" IsHitTestVisible="False"/>
+                        <Border x:Name="press" Background="#FF17171C" CornerRadius="6"
+                                Opacity="0" IsHitTestVisible="False"/>
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="#FF26262C"/>
-                            <Setter TargetName="b" Property="BorderBrush" Value="#FF3A3A42"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="#FF17171C"/>
-                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.14"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14"/></Storyboard></BeginStoryboard></Trigger.ExitActions></Trigger>
+                        <Trigger Property="IsPressed" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="press" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.09"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleX" To="0.98" Duration="0:0:0.09"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleY" To="0.98" Duration="0:0:0.09"/></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="press" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.12"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/></Storyboard></BeginStoryboard></Trigger.ExitActions></Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="b" Property="Opacity" Value="0.45"/>
+                            <Setter TargetName="root" Property="Opacity" Value="0.45"/>
                             <Setter Property="Cursor" Value="Arrow"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
@@ -71,21 +89,27 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="b" Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="1" CornerRadius="6"
-                            Padding="{TemplateBinding Padding}">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    <Grid x:Name="root" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="squash" ScaleX="1" ScaleY="1"/>
+                        </Grid.RenderTransform>
+                        <Border x:Name="b" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="6"/>
+                        <Border x:Name="hover" Background="{StaticResource Accent}" BorderBrush="{StaticResource Accent}"
+                                BorderThickness="1" CornerRadius="6"
+                                Opacity="0" IsHitTestVisible="False"/>
+                        <Border x:Name="press" Background="#FF8A6118" CornerRadius="6"
+                                Opacity="0" IsHitTestVisible="False"/>
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="{StaticResource Accent}"/>
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="#FF8A6118"/>
-                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.14"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14"/></Storyboard></BeginStoryboard></Trigger.ExitActions></Trigger>
+                        <Trigger Property="IsPressed" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="press" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.09"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleX" To="0.98" Duration="0:0:0.09"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleY" To="0.98" Duration="0:0:0.09"/></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="press" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.12"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/></Storyboard></BeginStoryboard></Trigger.ExitActions></Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="b" Property="Opacity" Value="0.45"/>
+                            <Setter TargetName="root" Property="Opacity" Value="0.45"/>
+                            <Setter Property="Cursor" Value="Arrow"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -108,21 +132,32 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="b" Background="{TemplateBinding Background}"
-                            CornerRadius="6" BorderThickness="1" BorderBrush="Transparent">
+                    <Grid x:Name="root" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="squash" ScaleX="1" ScaleY="1"/>
+                        </Grid.RenderTransform>
+                        <Border x:Name="b" Background="{TemplateBinding Background}"
+                                CornerRadius="6" BorderThickness="1" BorderBrush="Transparent"/>
+                        <Border x:Name="hover" Background="#FF222228" CornerRadius="6"
+                                Opacity="0" IsHitTestVisible="False"/>
+                        <Border x:Name="on" Background="{StaticResource AccentDeep}"
+                                BorderBrush="{StaticResource Accent}" BorderThickness="1"
+                                CornerRadius="6" Opacity="0" IsHitTestVisible="False"/>
+                        <Border x:Name="press" Background="#FF000000" CornerRadius="6"
+                                Opacity="0" IsHitTestVisible="False"/>
                         <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    </Border>
+                    </Grid>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="#FF222228"/>
-                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.14"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14"/></Storyboard></BeginStoryboard></Trigger.ExitActions></Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="b" Property="Background" Value="{StaticResource AccentDeep}"/>
-                            <Setter TargetName="b" Property="BorderBrush" Value="{StaticResource Accent}"/>
                             <Setter Property="Foreground" Value="White"/>
+                            <Setter TargetName="on" Property="Opacity" Value="1"/>
+                            <Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="on" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.14" FillBehavior="Stop"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation></Storyboard></BeginStoryboard></Trigger.EnterActions>
+                            <Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="on" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.14" FillBehavior="Stop"></DoubleAnimation></Storyboard></BeginStoryboard></Trigger.ExitActions>
                         </Trigger>
+                        <Trigger Property="IsPressed" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="press" Storyboard.TargetProperty="Opacity" To="0.18" Duration="0:0:0.09"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleX" To="0.96" Duration="0:0:0.09"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleY" To="0.96" Duration="0:0:0.09"/></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="press" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.12"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/></Storyboard></BeginStoryboard></Trigger.ExitActions></Trigger>
                         <Trigger Property="IsEnabled" Value="False">
-                            <Setter TargetName="b" Property="Opacity" Value="0.4"/>
+                            <Setter TargetName="root" Property="Opacity" Value="0.4"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -166,20 +201,30 @@
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
                     <StackPanel Orientation="Horizontal" Background="Transparent">
-                        <Border x:Name="box" Width="17" Height="17" CornerRadius="4"
-                                Background="#FF121216" BorderBrush="{StaticResource Edge}"
-                                BorderThickness="1" VerticalAlignment="Center">
+                        <Grid Width="17" Height="17" VerticalAlignment="Center">
+                            <Border x:Name="box" CornerRadius="4" Background="#FF121216"
+                                    BorderBrush="{StaticResource Edge}" BorderThickness="1"/>
+                            <Border x:Name="fill" CornerRadius="4" Background="{StaticResource AccentDeep}"
+                                    BorderBrush="{StaticResource Accent}" BorderThickness="1"
+                                    Opacity="0" IsHitTestVisible="False"/>
                             <Path x:Name="tick" Data="M 2,6 L 6,10 L 13,2" Stroke="White"
-                                  StrokeThickness="2" Visibility="Collapsed"
-                                  StrokeEndLineCap="Round" StrokeStartLineCap="Round"/>
-                        </Border>
+                                  StrokeThickness="2" Opacity="0" IsHitTestVisible="False"
+                                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="1,1,0,0"
+                                  RenderTransformOrigin="0.5,0.5"
+                                  StrokeEndLineCap="Round" StrokeStartLineCap="Round">
+                                <Path.RenderTransform>
+                                    <ScaleTransform x:Name="tickScale" ScaleX="1" ScaleY="1"/>
+                                </Path.RenderTransform>
+                            </Path>
+                        </Grid>
                         <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="box" Property="Background" Value="{StaticResource AccentDeep}"/>
-                            <Setter TargetName="box" Property="BorderBrush" Value="{StaticResource Accent}"/>
-                            <Setter TargetName="tick" Property="Visibility" Value="Visible"/>
+                            <Setter TargetName="fill" Property="Opacity" Value="1"/>
+                            <Setter TargetName="tick" Property="Opacity" Value="1"/>
+                            <Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="fill" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.14" FillBehavior="Stop"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation><DoubleAnimation Storyboard.TargetName="tick" Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.14" FillBehavior="Stop"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation><DoubleAnimation Storyboard.TargetName="tickScale" Storyboard.TargetProperty="ScaleX" From="0.6" To="1" Duration="0:0:0.14" FillBehavior="Stop"><DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.6"/></DoubleAnimation.EasingFunction></DoubleAnimation><DoubleAnimation Storyboard.TargetName="tickScale" Storyboard.TargetProperty="ScaleY" From="0.6" To="1" Duration="0:0:0.14" FillBehavior="Stop"><DoubleAnimation.EasingFunction><BackEase EasingMode="EaseOut" Amplitude="0.6"/></DoubleAnimation.EasingFunction></DoubleAnimation></Storyboard></BeginStoryboard></Trigger.EnterActions>
+                            <Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="fill" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.14" FillBehavior="Stop"></DoubleAnimation><DoubleAnimation Storyboard.TargetName="tick" Storyboard.TargetProperty="Opacity" From="1" To="0" Duration="0:0:0.10" FillBehavior="Stop"></DoubleAnimation><DoubleAnimation Storyboard.TargetName="tickScale" Storyboard.TargetProperty="ScaleX" From="1" To="0.6" Duration="0:0:0.10" FillBehavior="Stop"></DoubleAnimation><DoubleAnimation Storyboard.TargetName="tickScale" Storyboard.TargetProperty="ScaleY" From="1" To="0.6" Duration="0:0:0.10" FillBehavior="Stop"></DoubleAnimation></Storyboard></BeginStoryboard></Trigger.ExitActions>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="box" Property="BorderBrush" Value="{StaticResource Accent}"/>

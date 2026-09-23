@@ -1,8 +1,7 @@
 # Build output
 bin/
 obj/
-dist/app/
-dist/*.exe
+dist/
 *.user
 
 # Editor noise

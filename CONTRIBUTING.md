@@ -113,6 +113,16 @@ These are the ones worth knowing before a first change.
    inside an existing surface — the way thirty symbols live behind one button —
    rather than as another toolbar item.
 6. **Comments explain why.** What the code does is readable from the code.
+7. **Animate opacity and transforms, nothing else.** Both compose on the render
+   thread and cost nothing measurable. Animating `Width`, `Height` or `Margin`
+   forces a layout pass every frame, which is where a smooth interface turns
+   into a janky one. Durations live in the comment at the top of `Theme.xaml`;
+   stay inside them.
+8. **A state that only lives in `Trigger.EnterActions` does not exist.** A
+   control created already in that state never transitions, so the storyboard
+   never runs and the control renders wrong. Set the resting value with a
+   `Setter` and let the storyboard cover only the transition, with an explicit
+   `From` and `FillBehavior="Stop"`.
 
 ## Style
 
