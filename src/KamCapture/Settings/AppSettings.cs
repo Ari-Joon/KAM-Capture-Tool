@@ -9,6 +9,9 @@ namespace KamCapture.Settings
     public enum SnipMode { Region, Window, FullScreen, Monitor, Freeform }
     public enum BorderStyleKind { Solid, Dashed, Dotted, Glow }
 
+    /// <summary>The three things the tool does, as the home window offers them.</summary>
+    public enum Activity { Screenshot, Video, Audio }
+
     public sealed class AppSettings
     {
         // ---- Capture overlay appearance (the colour wheel lives here) ----
@@ -52,11 +55,36 @@ namespace KamCapture.Settings
         public bool RecordSystemAudio { get; set; } = true;
         public bool RecordMicrophone { get; set; } = false;
         public string MicrophoneDeviceId { get; set; } = "";
+
+        /// <summary>
+        /// Which output device system audio is taken from. Empty means the
+        /// Windows default. It matters for calls: Teams can play through a
+        /// headset that is not the default, and loopback of the default would
+        /// then record the meeting as silence.
+        /// </summary>
+        public string SystemAudioDeviceId { get; set; } = "";
         public double MicrophoneGain { get; set; } = 1.0;
         public double SystemAudioGain { get; set; } = 1.0;
         public string FfmpegPath { get; set; } = "";
         public string VideoEncoder { get; set; } = "auto";    // auto | libx264 | h264_nvenc | h264_qsv | h264_amf
         public string RecordFolder { get; set; } = "";
+
+        /// <summary>Where audio-only recordings go: their own folder, not mixed in with videos.</summary>
+        public string AudioFolder { get; set; } = "";
+
+        /// <summary>What the home window shows first: the last thing you did.</summary>
+        public Activity LastActivity { get; set; } = Activity.Screenshot;
+
+        /// <summary>What a video recording covers. Monitor is the display under the pointer.</summary>
+        public SnipMode VideoMode { get; set; } = SnipMode.Monitor;
+
+        /// <summary>
+        /// Audio-only recordings: mp3, m4a or wav. MP3 by default because it
+        /// opens everywhere and survives an interrupted recording — every
+        /// frame stands alone, so a crash costs the last second rather than
+        /// the whole file, which an unfinished M4A would.
+        /// </summary>
+        public string AudioFormat { get; set; } = "mp3";
 
         /// <summary>
         /// OneDrive folders the user explicitly chose and confirmed. Windows
@@ -128,14 +156,18 @@ namespace KamCapture.Settings
                 Services.OutputFolder.DefaultCaptures(), ".png", Current.IsChosen);
             var recordings = Relocate(Current.RecordFolder,
                 Services.OutputFolder.DefaultRecordings(), ".mp4", Current.IsChosen);
+            var audio = Relocate(Current.AudioFolder,
+                Services.OutputFolder.DefaultAudio(), ".mp3", Current.IsChosen);
 
             // Write the move back out, or the settings file keeps pointing at a
             // folder nothing is being saved to.
             bool moved = !string.Equals(captures, Current.SaveFolder, StringComparison.OrdinalIgnoreCase)
-                      || !string.Equals(recordings, Current.RecordFolder, StringComparison.OrdinalIgnoreCase);
+                      || !string.Equals(recordings, Current.RecordFolder, StringComparison.OrdinalIgnoreCase)
+                      || !string.Equals(audio, Current.AudioFolder, StringComparison.OrdinalIgnoreCase);
 
             Current.SaveFolder = captures;
             Current.RecordFolder = recordings;
+            Current.AudioFolder = audio;
             if (moved) Current.Save();
 
             return Current;
@@ -173,23 +205,6 @@ namespace KamCapture.Settings
         /// remembers it, so a capture is never lost to a folder problem and
         /// never quietly turned into an upload.
         /// </summary>
-        /// <summary>
-        /// True when the last thing produced was a recording. "Open folder"
-        /// follows it, so finishing a video does not drop you in Screenshots.
-        /// </summary>
-        public bool LastOutputWasRecording { get; set; }
-
-        public void NoteOutput(bool recording)
-        {
-            if (LastOutputWasRecording == recording) return;
-            LastOutputWasRecording = recording;
-            Save();
-        }
-
-        /// <summary>The folder matching whatever was produced last.</summary>
-        public string EnsureLastOutputFolder() =>
-            LastOutputWasRecording ? EnsureRecordFolder() : EnsureSaveFolder();
-
         public string EnsureSaveFolder() =>
             Remember(Services.OutputFolder.Resolve(SaveFolder, Services.OutputFolder.CapturesLeaf, IsChosen(SaveFolder)),
                      SaveFolder, v => SaveFolder = v, "Capture");
@@ -197,6 +212,10 @@ namespace KamCapture.Settings
         public string EnsureRecordFolder() =>
             Remember(Services.OutputFolder.Resolve(RecordFolder, Services.OutputFolder.RecordingsLeaf, IsChosen(RecordFolder)),
                      RecordFolder, v => RecordFolder = v, "Recording");
+
+        public string EnsureAudioFolder() =>
+            Remember(Services.OutputFolder.Resolve(AudioFolder, Services.OutputFolder.AudioLeaf, IsChosen(AudioFolder)),
+                     AudioFolder, v => AudioFolder = v, "Audio");
 
         /// <summary>True when this synced folder was explicitly confirmed in Settings.</summary>
         public bool IsChosen(string? path)

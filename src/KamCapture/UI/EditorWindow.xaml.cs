@@ -78,6 +78,14 @@ namespace KamCapture.UI
             UpdateChrome();
         }
 
+        /// <summary>The window as it looks with one tool picked, for the layout check.</summary>
+        internal void PrepareForLayoutCheck(EditTool tool)
+        {
+            _ready = true;
+            _forceChrome = true;
+            SelectTool(tool);
+        }
+
         private System.Collections.Generic.IEnumerable<AnnItem> SampleAnnotations()
         {
             yield return new StepItem
@@ -498,7 +506,6 @@ namespace KamCapture.UI
 
                 SaveTo(path, Flatten());
                 _lastSavedPath = path;
-                _cfg.NoteOutput(recording: false);
                 Flash("Saved to " + path);
             }
             catch (Exception ex)
@@ -524,7 +531,6 @@ namespace KamCapture.UI
             {
                 SaveTo(dlg.FileName, Flatten());
                 _lastSavedPath = dlg.FileName;
-                _cfg.NoteOutput(recording: false);
                 Flash("Saved to " + dlg.FileName);
             }
             catch (Exception ex)

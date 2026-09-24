@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using Activity = KamCapture.Settings.Activity;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -12,6 +13,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using KamCapture.Capture;
 using KamCapture.Interop;
+using KamCapture.Recording;
 using KamCapture.Services;
 using KamCapture.Settings;
 using KamCapture.Setup;
@@ -37,6 +39,21 @@ namespace KamCapture.UI
             public override string ToString() => Label;
         }
 
+        private Activity _activity = Activity.Screenshot;
+        private bool _loading;
+
+        // The status line: a message while it is fresh, otherwise the hint.
+        private string? _message;
+        private string _hint = "";
+
+        // Lets the layout check draw the window mid-recording without recording.
+        private bool _pretendRecording;
+
+        private sealed record DeviceItem(string Label, string Id)
+        {
+            public override string ToString() => Label;
+        }
+
         public MainWindow(AppSettings cfg)
         {
             InitializeComponent();
@@ -52,11 +69,12 @@ namespace KamCapture.UI
                 new Item("5 seconds", 5), new Item("10 seconds", 10)
             };
 
+            LoadDevices();
             LoadFromSettings();
 
             CaptureController.Notified += Say;
             RecordingController.Notified += Say;
-            RecordingController.StateChanged += UpdateRecordButton;
+            RecordingController.StateChanged += OnRecordingStateChanged;
             UpdateService.Changed += RenderUpdates;
             UpdateBar.SizeChanged += (_, _) => FitToBar();
 
@@ -65,7 +83,7 @@ namespace KamCapture.UI
             {
                 CaptureController.Notified -= Say;
                 RecordingController.Notified -= Say;
-                RecordingController.StateChanged -= UpdateRecordButton;
+                RecordingController.StateChanged -= OnRecordingStateChanged;
                 UpdateService.Changed -= RenderUpdates;
             };
 
@@ -90,11 +108,16 @@ namespace KamCapture.UI
 
         private void LoadFromSettings()
         {
-            SetMode(_cfg.DefaultMode);
+            _loading = true;
 
             foreach (var o in CmbDelay.Items)
                 if (o is Item it && Equals(it.Value, _cfg.DelaySeconds)) { CmbDelay.SelectedItem = o; break; }
             if (CmbDelay.SelectedItem == null) CmbDelay.SelectedIndex = 0;
+
+            ChkSystem.IsChecked = _cfg.RecordSystemAudio;
+            ChkMic.IsChecked = _cfg.RecordMicrophone;
+            SelectDevice(CmbOutput, _cfg.SystemAudioDeviceId);
+            SelectDevice(CmbMic, _cfg.MicrophoneDeviceId);
 
             var mons = Screens.All();
             var (_, _, vw, vh) = Screens.VirtualBounds();
@@ -108,76 +131,281 @@ namespace KamCapture.UI
                 ? $"{mons[0].Describe()}{scaling} — captured at full device resolution"
                 : $"{mons.Count} displays, {vw} × {vh} together{scaling} — captured at full device resolution";
 
-            UpdateHotkeyHint();
-            UpdateRecordButton();
+            BtnOpenShots.ToolTip = _cfg.SaveFolder;
+            BtnOpenVideo.ToolTip = _cfg.RecordFolder;
+            BtnOpenAudio.ToolTip = _cfg.AudioFolder;
+
+            _loading = false;
+            ShowActivity(_cfg.LastActivity, animate: false, save: false);
         }
 
-        private void UpdateHotkeyHint()
+        // ---------------- the three activities ----------------
+
+        /// <summary>Bring the window up on one activity. Used when something needs choosing first.</summary>
+        public void ShowActivity(Activity activity)
         {
-            // One hint, not three: the full list is in Settings.
-            LblHotkeys.Text = _cfg.HotkeysEnabled
-                ? _cfg.HotkeyRegion + " anywhere in Windows"
-                : "Global shortcuts are off";
+            ShowActivity(activity, animate: IsVisible, save: true);
+            Show();
+            if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+            Activate();
         }
 
-        private void UpdateRecordButton()
+        /// <summary>Render one activity for the documentation screenshots.</summary>
+        internal void PrepareActivityForDocShot(Activity activity) =>
+            ShowActivity(activity, animate: false, save: false);
+
+        /// <summary>Put the window in a state for the layout check to measure.</summary>
+        internal void PrepareForLayoutCheck(Activity activity, bool recording, string? message, bool longDeviceNames = false)
         {
-            Dispatcher.BeginInvoke(new Action(() =>
+            if (longDeviceNames)
             {
-                BtnRecord.Content = RecordingController.IsRecording ? "Recording…" : "Record screen";
-                BtnRecord.IsEnabled = !RecordingController.IsRecording;
-            }));
+                // Real device names run long: "Headset Earphone (Jabra Evolve2 65 with a very long suffix)".
+                FillDevices(CmbOutput, "Headset Earphone (Some Very Long Bluetooth Hands-Free AG Audio Device Name)",
+                    new System.Collections.Generic.List<AudioDevice>(), "");
+                FillDevices(CmbMic, "Microphone Array (Intel® Smart Sound Technology for Digital Microphones)",
+                    new System.Collections.Generic.List<AudioDevice>(), "");
+            }
+            _pretendRecording = recording;
+            ShowActivity(activity, animate: false, save: false);
+            _message = message;
+            RenderStatus();
+        }
+
+        /// <summary>
+        /// Pick what you are doing; everything else follows from it. Only the
+        /// options that apply are shown, and the button says exactly what will
+        /// happen when it is pressed.
+        /// </summary>
+        private void ShowActivity(Activity activity, bool animate, bool save)
+        {
+            _activity = activity;
+            ActScreenshot.IsChecked = activity == Activity.Screenshot;
+            ActVideo.IsChecked = activity == Activity.Video;
+            ActAudio.IsChecked = activity == Activity.Audio;
+
+            bool shot = activity == Activity.Screenshot;
+            bool video = activity == Activity.Video;
+            bool audio = activity == Activity.Audio;
+
+            SetVisible(RowWhat, shot || video);
+            SetVisible(RowDelay, shot);
+            SetVisible(RowSystem, video || audio);
+            SetVisible(RowMic, video || audio);
+            SetVisible(LblNote, audio);
+
+            SetWhat(shot ? _cfg.DefaultMode : _cfg.VideoMode);
+
+            if (save && _cfg.LastActivity != activity)
+            {
+                _cfg.LastActivity = activity;
+                _cfg.Save();
+            }
+
+            UpdatePrimary();
+            UpdateHint();
+            if (animate) FadeIn(Options);
+        }
+
+        private static void SetVisible(UIElement element, bool visible) =>
+            element.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+
+        /// <summary>A 140ms fade: the motion vocabulary's state change, opacity only.</summary>
+        private static void FadeIn(UIElement element)
+        {
+            element.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                FillBehavior = FillBehavior.Stop
+            });
+        }
+
+        private void OnActivityClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is ToggleButton { Tag: string tag } && Enum.TryParse<Activity>(tag, out var activity))
+                ShowActivity(activity, animate: activity != _activity, save: true);
+        }
+
+        private void SetWhat(SnipMode mode)
+        {
+            // Older settings may hold modes the home window no longer offers.
+            mode = mode switch
+            {
+                SnipMode.FullScreen => SnipMode.Monitor,
+                SnipMode.Freeform => SnipMode.Region,
+                _ => mode
+            };
+            foreach (var tb in new[] { WhatRegion, WhatWindow, WhatScreen })
+                tb.IsChecked = (tb.Tag as string) == mode.ToString();
+        }
+
+        private SnipMode CurrentWhat()
+        {
+            foreach (var tb in new[] { WhatRegion, WhatWindow, WhatScreen })
+                if (tb.IsChecked == true && Enum.TryParse<SnipMode>(tb.Tag as string, out var m)) return m;
+            return SnipMode.Region;
+        }
+
+        private void OnWhatClick(object sender, RoutedEventArgs e)
+        {
+            if (sender is not ToggleButton { Tag: string tag } || !Enum.TryParse<SnipMode>(tag, out var mode)) return;
+            SetWhat(mode);
+
+            // Screenshots and videos each remember their own choice.
+            if (_activity == Activity.Video) _cfg.VideoMode = mode;
+            else _cfg.DefaultMode = mode;
+            _cfg.Save();
+        }
+
+        // ---------------- sound ----------------
+
+        private void LoadDevices()
+        {
+            FillDevices(CmbOutput, "Default output", AudioDevices.Outputs(), _cfg.SystemAudioDeviceId);
+            FillDevices(CmbMic, "Default microphone", AudioDevices.Inputs(), _cfg.MicrophoneDeviceId);
+        }
+
+        private void FillDevices(ComboBox box, string defaultLabel, System.Collections.Generic.List<AudioDevice> devices, string selectedId)
+        {
+            bool wasLoading = _loading;
+            _loading = true;
+
+            var items = new System.Collections.Generic.List<DeviceItem> { new(defaultLabel, "") };
+            foreach (var d in devices) items.Add(new DeviceItem(d.Name, d.Id));
+            box.ItemsSource = items;
+            SelectDevice(box, selectedId);
+
+            _loading = wasLoading;
+        }
+
+        private static void SelectDevice(ComboBox box, string id)
+        {
+            if (box.ItemsSource is not System.Collections.Generic.IEnumerable<DeviceItem> items) return;
+            box.SelectedItem = items.FirstOrDefault(i => i.Id == id) ?? items.FirstOrDefault();
+        }
+
+        /// <summary>Headsets come and go; list what is plugged in at the moment the list opens.</summary>
+        private void OnDevicesOpened(object? sender, EventArgs e)
+        {
+            if (sender == CmbOutput)
+                FillDevices(CmbOutput, "Default output", AudioDevices.Outputs(), _cfg.SystemAudioDeviceId);
+            else if (sender == CmbMic)
+                FillDevices(CmbMic, "Default microphone", AudioDevices.Inputs(), _cfg.MicrophoneDeviceId);
+        }
+
+        private void OnSoundToggled(object sender, RoutedEventArgs e)
+        {
+            if (_loading) return;
+            _cfg.RecordSystemAudio = ChkSystem.IsChecked == true;
+            _cfg.RecordMicrophone = ChkMic.IsChecked == true;
+            _cfg.Save();
+            UpdatePrimary();
+        }
+
+        private void OnOutputChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading || CmbOutput.SelectedItem is not DeviceItem item) return;
+            _cfg.SystemAudioDeviceId = item.Id;
+            _cfg.Save();
+        }
+
+        private void OnMicChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading || CmbMic.SelectedItem is not DeviceItem item) return;
+            _cfg.MicrophoneDeviceId = item.Id;
+            _cfg.Save();
+        }
+
+        // ---------------- the one button ----------------
+
+        private void OnRecordingStateChanged() =>
+            Dispatcher.BeginInvoke(new Action(UpdatePrimary));
+
+        private void UpdatePrimary()
+        {
+            bool recording = _pretendRecording || RecordingController.IsRecording;
+            bool anySource = ChkSystem.IsChecked == true || ChkMic.IsChecked == true;
+
+            (string label, bool enabled) = _activity switch
+            {
+                Activity.Screenshot => ("Take screenshot", true),
+                Activity.Video => (recording ? "Stop recording" : "Start recording", true),
+                _ => (recording ? "Stop recording" : "Start recording audio", recording || anySource)
+            };
+            BtnPrimary.Content = label;
+            BtnPrimary.IsEnabled = enabled;
+
+            // Once it is running, sources are switched on the recording bar.
+            RowSystem.IsEnabled = !recording;
+            RowMic.IsEnabled = !recording;
+
+            var format = (_cfg.AudioFormat ?? "mp3").ToUpperInvariant();
+            LblNote.Text = recording
+                ? "Recording. Switch sources on or off from the recording bar."
+                : anySource
+                    ? $"Saved as {format}. Either source can be switched on or off while it records."
+                    : "Choose system audio, the microphone, or both.";
+        }
+
+        private void UpdateHint()
+        {
+            _hint = !_cfg.HotkeysEnabled
+                ? ""
+                : _activity switch
+                {
+                    Activity.Screenshot => _cfg.HotkeyRegion + " takes a screenshot from anywhere in Windows",
+                    Activity.Video => _cfg.HotkeyRecord + " starts and stops a video from anywhere",
+                    _ => ""
+                };
+            RenderStatus();
         }
 
         private void Say(string message)
         {
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                LblStatus.Text = message;
+                _message = message;
+                RenderStatus();
                 var t = new DispatcherTimer { Interval = TimeSpan.FromSeconds(12) };
-                t.Tick += (_, _) => { t.Stop(); if (LblStatus.Text == message) LblStatus.Text = ""; };
+                t.Tick += (_, _) =>
+                {
+                    t.Stop();
+                    if (_message != message) return;
+                    _message = null;
+                    RenderStatus();
+                };
                 t.Start();
             }));
         }
 
-        private void SetMode(SnipMode mode)
+        private void RenderStatus()
         {
-            foreach (var tb in new[] { ModeRegion, ModeWindow, ModeMonitor })
-                tb.IsChecked = (tb.Tag as string) == mode.ToString();
+            var text = _message ?? _hint;
+            LblStatus.Text = text;
+            LblStatus.Foreground = (Brush)FindResource(_message != null ? "Fg" : "FgDim");
+            LblStatus.ToolTip = string.IsNullOrEmpty(text) ? null : text;
         }
 
-        private SnipMode CurrentMode()
+        private async void OnPrimary(object sender, RoutedEventArgs e)
         {
-            foreach (var tb in new[] { ModeRegion, ModeWindow, ModeMonitor })
-                if (tb.IsChecked == true && Enum.TryParse<SnipMode>(tb.Tag as string, out var m)) return m;
-            return SnipMode.Region;
-        }
-
-        private void OnModeClick(object sender, RoutedEventArgs e)
-        {
-            if (sender is not ToggleButton tb) return;
-            if (Enum.TryParse<SnipMode>(tb.Tag as string, out var m))
+            switch (_activity)
             {
-                SetMode(m);
-                _cfg.DefaultMode = m;
-                _cfg.Save();
+                case Activity.Screenshot:
+                    if (CmbDelay.SelectedItem is Item { Value: int d } && d != _cfg.DelaySeconds)
+                    {
+                        _cfg.DelaySeconds = d;
+                        _cfg.Save();
+                    }
+                    await CaptureController.RunAsync(CurrentWhat(), _cfg);
+                    break;
+
+                case Activity.Video:
+                    await RecordingController.StartVideoAsync(_cfg);
+                    break;
+
+                case Activity.Audio:
+                    await RecordingController.StartAudioAsync(_cfg);
+                    break;
             }
-        }
-
-
-        private async void OnCapture(object sender, RoutedEventArgs e)
-        {
-            if (CmbDelay.SelectedItem is Item { Value: int d })
-            {
-                _cfg.DelaySeconds = d;
-                _cfg.Save();
-            }
-            await CaptureController.RunAsync(CurrentMode(), _cfg);
-        }
-
-        private async void OnRecord(object sender, RoutedEventArgs e)
-        {
-            await RecordingController.StartAsync(_cfg);
         }
 
         private void OnSettings(object sender, RoutedEventArgs e)
@@ -190,11 +418,16 @@ namespace KamCapture.UI
             }
         }
 
-        private void OnOpenFolder(object sender, RoutedEventArgs e)
+        private void OnOpenScreenshots(object sender, RoutedEventArgs e) => OpenFolder(_cfg.EnsureSaveFolder);
+        private void OnOpenVideo(object sender, RoutedEventArgs e) => OpenFolder(_cfg.EnsureRecordFolder);
+        private void OnOpenAudio(object sender, RoutedEventArgs e) => OpenFolder(_cfg.EnsureAudioFolder);
+
+        /// <summary>Created if it is not there yet, so the button always goes somewhere.</summary>
+        private void OpenFolder(Func<string> ensure)
         {
             try
             {
-                var folder = _cfg.EnsureLastOutputFolder();
+                var folder = ensure();
                 Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
             }
             catch (Exception ex) { Say("Could not open the folder: " + ex.Message); }
@@ -254,13 +487,23 @@ namespace KamCapture.UI
             LblUpdates.Visibility = label == null ? Visibility.Collapsed : Visibility.Visible;
             BtnUpdates.Foreground = (Brush)FindResource(offering ? "Accent" : "FgDim");
             BtnUpdates.BorderBrush = offering ? (Brush)FindResource("AccentDeep") : Brushes.Transparent;
-            BtnUpdates.ToolTip = offering
-                ? $"KAM Capture Tool {release!.Tag} is available"
-                : $"Check for updates. You have {Updater.Current.ToString(3)}.";
+            BtnUpdates.ToolTip = stage switch
+            {
+                Stage.Downloading => $"Downloading {release?.Tag}. Click to cancel.",
+                Stage.Installing => "Installing. KAM Capture Tool will close and reopen in a moment.",
+                _ when offering => $"KAM Capture Tool {release!.Tag} is available",
+                _ => $"Check for updates. You have {Updater.Current.ToString(3)}."
+            };
 
-            // ---- the bar: only when there is something to act on ----
-            UpdateProgress.Visibility = Visibility.Collapsed;
-            UpdateProgress.IsIndeterminate = false;
+            // ---- the bar: only when there is a decision to make ----
+            // Downloading and installing are shown on the chip alone, with the
+            // percentage; a second progress bar said the same thing twice.
+            if (stage is Stage.Downloading or Stage.Installing)
+            {
+                UpdateBar.Visibility = Visibility.Collapsed;
+                return;
+            }
+
             BtnBarSecondary.Visibility = Visibility.Visible;
             BtnBarPrimary.Visibility = Visibility.Visible;
             BtnBarPrimary.IsEnabled = true;
@@ -294,22 +537,6 @@ namespace KamCapture.UI
                     BtnBarPrimary.Content = Installer.IsRunningInstalled ? "Update now" : "Get the update";
                     break;
 
-                case Stage.Downloading:
-                    RunUpdate.Text = $"Downloading KAM Capture Tool {tag}… {progress:0%} ";
-                    BtnBarSecondary.Content = "Cancel";
-                    BtnBarPrimary.Visibility = Visibility.Collapsed;
-                    UpdateProgress.Visibility = Visibility.Visible;
-                    UpdateProgress.Value = progress;
-                    break;
-
-                case Stage.Installing:
-                    RunUpdate.Text = $"Installing {tag}. KAM Capture Tool will close and reopen in a moment. ";
-                    BtnBarSecondary.Visibility = Visibility.Collapsed;
-                    BtnBarPrimary.Visibility = Visibility.Collapsed;
-                    UpdateProgress.Visibility = Visibility.Visible;
-                    UpdateProgress.IsIndeterminate = true;
-                    break;
-
                 case Stage.Failed:
                     UpdateDot.Fill = (Brush)FindResource("Danger");
                     RunUpdate.Text = (problem ?? "The update did not finish.") + " ";
@@ -324,6 +551,13 @@ namespace KamCapture.UI
 
         private async void OnUpdatesClick(object sender, RoutedEventArgs e)
         {
+            // The chip is the only place a download shows, so it is where it stops.
+            if (UpdateService.Now == Stage.Downloading)
+            {
+                UpdateService.Cancel();
+                return;
+            }
+
             // A version is waiting: show its bar, even after "Not now".
             if (UpdateService.Release != null && UpdateService.Now != Stage.Checking)
             {
@@ -365,12 +599,6 @@ namespace KamCapture.UI
 
         private void OnBarSecondary(object sender, RoutedEventArgs e)
         {
-            if (UpdateService.Now == Stage.Downloading)
-            {
-                UpdateService.Cancel();
-                return;
-            }
-
             if (UpdateService.Release == null)
             {
                 _updatedFrom = null;      // "Dismiss" on the updated note

@@ -17,6 +17,8 @@ namespace KamCapture
         private static AppSettings _cfg = new();
         private static MainWindow? _main;
         private static Forms.ToolStripMenuItem? _trayUpdate;
+        private static Forms.ToolStripMenuItem? _trayVideo;
+        private static Forms.ToolStripMenuItem? _trayAudio;
         private static bool _balloonIsUpdate;
 
         /// <summary>Set once the application is really exiting; until then the home window only hides.</summary>
@@ -109,12 +111,18 @@ namespace KamCapture
                 return;
             }
 
-            var recTest = e.Args.FirstOrDefault(a => a.StartsWith("--rectest=", StringComparison.OrdinalIgnoreCase));
-            if (recTest != null)
+            // Headless recording checks: file,seconds[,pause seconds].
+            foreach (var (flag, audio) in new[] { ("--rectest=", false), ("--audiotest=", true) })
             {
-                var spec = recTest["--rectest=".Length..].Split(',');
+                var arg = e.Args.FirstOrDefault(a => a.StartsWith(flag, StringComparison.OrdinalIgnoreCase));
+                if (arg == null) continue;
+
+                var spec = arg[flag.Length..].Split(',');
                 int secs = spec.Length > 1 && int.TryParse(spec[1], out var n) ? n : 4;
-                Environment.ExitCode = SelfTest.RecordTest(spec[0], secs);
+                int pause = spec.Length > 2 && int.TryParse(spec[2], out var q) ? q : 0;
+                Environment.ExitCode = audio
+                    ? SelfTest.AudioTest(spec[0], secs, pause)
+                    : SelfTest.RecordTest(spec[0], secs, pause);
                 Shutdown();
                 return;
             }
@@ -124,6 +132,17 @@ namespace KamCapture
             {
                 var dir = docShots.Contains('=') ? docShots[(docShots.IndexOf('=') + 1)..] : "docs/images";
                 Environment.ExitCode = DocShots.Run(dir);
+                Shutdown();
+                return;
+            }
+
+            var layoutCheck = e.Args.FirstOrDefault(a => a.StartsWith("--layoutcheck", StringComparison.OrdinalIgnoreCase));
+            if (layoutCheck != null)
+            {
+                var dir = layoutCheck.Contains('=')
+                    ? layoutCheck[(layoutCheck.IndexOf('=') + 1)..]
+                    : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "KAM Capture Tool", "layout-check");
+                Environment.ExitCode = LayoutCheck.Run(dir);
                 Shutdown();
                 return;
             }
@@ -186,6 +205,10 @@ namespace KamCapture
             var mode = e.Args.FirstOrDefault(a => a.StartsWith("--capture=", StringComparison.OrdinalIgnoreCase));
             if (mode != null && Enum.TryParse<SnipMode>(mode["--capture=".Length..], true, out var m))
                 _ = CaptureController.RunAsync(m, _cfg);
+            else if (e.Args.Any(a => a.Equals("--record", StringComparison.OrdinalIgnoreCase)))
+                _ = RecordingController.StartVideoAsync(_cfg);
+            else if (e.Args.Any(a => a.Equals("--record-audio", StringComparison.OrdinalIgnoreCase)))
+                _ = RecordingController.StartAudioAsync(_cfg);
 
             StartUpdates(e.Args);
         }
@@ -414,7 +437,13 @@ namespace KamCapture
 
             if (args.Any(a => a.Equals("--record", StringComparison.OrdinalIgnoreCase)))
             {
-                _ = RecordingController.StartAsync(_cfg);
+                _ = RecordingController.StartVideoAsync(_cfg);
+                return;
+            }
+
+            if (args.Any(a => a.Equals("--record-audio", StringComparison.OrdinalIgnoreCase)))
+            {
+                _ = RecordingController.StartAudioAsync(_cfg);
                 return;
             }
 
@@ -440,11 +469,18 @@ namespace KamCapture
                 _trayUpdate.Font = new System.Drawing.Font(menu.Font, System.Drawing.FontStyle.Bold);
                 menu.Items.Add(_trayUpdate);
 
-                menu.Items.Add("New capture", null, (_, _) => Start(SnipMode.Region));
-                menu.Items.Add("Capture a window", null, (_, _) => Start(SnipMode.Window));
-                menu.Items.Add("Capture everything", null, (_, _) => Start(SnipMode.FullScreen));
+                // The same three activities as the home window, in the same words.
+                menu.Items.Add("Screenshot a region", null, (_, _) => Start(SnipMode.Region));
+                menu.Items.Add("Screenshot a window", null, (_, _) => Start(SnipMode.Window));
+                menu.Items.Add("Screenshot the full screen", null, (_, _) => Start(SnipMode.Monitor));
                 menu.Items.Add(new Forms.ToolStripSeparator());
-                menu.Items.Add("Record screen…", null, (_, _) => _ = RecordingController.StartAsync(_cfg));
+                _trayVideo = new Forms.ToolStripMenuItem("Record video", null,
+                    (_, _) => _ = RecordingController.StartVideoAsync(_cfg));
+                _trayAudio = new Forms.ToolStripMenuItem("Record audio", null,
+                    (_, _) => _ = RecordingController.StartAudioAsync(_cfg));
+                menu.Items.Add(_trayVideo);
+                menu.Items.Add(_trayAudio);
+                RecordingController.StateChanged += UpdateTrayRecording;
                 menu.Items.Add(new Forms.ToolStripSeparator());
                 menu.Items.Add("Open KAM Capture Tool", null, (_, _) => ShowMain());
                 menu.Items.Add("Settings…", null, (_, _) => OpenSettings());
@@ -520,6 +556,25 @@ namespace KamCapture
 
         // ---------------- hotkeys ----------------
 
+        private static void UpdateTrayRecording()
+        {
+            Current?.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                bool recording = RecordingController.IsRecording;
+                bool audio = RecordingController.IsRecordingAudioOnly;
+                if (_trayVideo != null)
+                {
+                    _trayVideo.Text = recording && !audio ? "Stop recording video" : "Record video";
+                    _trayVideo.Enabled = !recording || !audio;
+                }
+                if (_trayAudio != null)
+                {
+                    _trayAudio.Text = recording && audio ? "Stop recording audio" : "Record audio";
+                    _trayAudio.Enabled = !recording || audio;
+                }
+            }));
+        }
+
         public static void ReapplyHotkeys()
         {
             _hotkeys ??= new HotkeyService();
@@ -541,7 +596,7 @@ namespace KamCapture
             Bind(_cfg.HotkeyRecord, () =>
             {
                 if (RecordingController.IsRecording) RecordingController.StopActive();
-                else _ = RecordingController.StartAsync(_cfg);
+                else _ = RecordingController.StartVideoAsync(_cfg);
             });
 
             if (failed.Count > 0 && _tray != null)

@@ -31,6 +31,13 @@ jobs:
           $size = (Get-Item selftest.png).Length
           Write-Host "self-test image: $([math]::Round($size/1kb,1)) KB"
 
+      # Every window laid out offscreen, in the states that stretch it; fails
+      # if anything is cut off. Needs no display.
+      - name: Layout check
+        run: |
+          dotnet run --project src/KamCapture -c Release --no-build -- --layoutcheck=layout-check
+          if ($LASTEXITCODE -ne 0) { throw 'something is cut off' }
+
       # Both run the real code against scratch folders and a scratch registry
       # key, and need no display. The update check makes no network request.
       - name: Install and update checks
@@ -65,3 +72,4 @@ jobs:
           path: |
             dist/app/KamCapture.exe
             selftest.png
+            layout-check/*.png

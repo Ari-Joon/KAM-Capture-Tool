@@ -100,9 +100,10 @@ namespace KamCapture.Services
                 try
                 {
                     var folder = cfg.EnsureSaveFolder();
-                    savedPath = Path.Combine(folder, cfg.BuildFileName(".png"));
+                    // Names are to the second; capturing a deck quickly can take
+                    // two in one second, and the second must not replace the first.
+                    savedPath = NameDialog.UniquePath(Path.Combine(folder, cfg.BuildFileName(".png")));
                     EditorWindow.SaveTo(savedPath, image);
-                    cfg.NoteOutput(recording: false);
                     saved = true;
                 }
                 catch (Exception ex)
@@ -132,14 +133,18 @@ namespace KamCapture.Services
                 editor.Show();
                 editor.Activate();
             }
-            else
+            else if (home != null)
             {
-                home?.Show();
+                // Back where it was, without taking the keyboard: a slide taken
+                // in the middle of a call should leave the call in front.
+                home.ShowActivated = false;
+                home.Show();
+                home.ShowActivated = true;
             }
 
             var parts = new List<string>();
             if (copied) parts.Add("copied to the clipboard");
-            if (saved && savedPath != null) parts.Add("saved to " + savedPath);
+            if (saved && savedPath != null) parts.Add("saved as " + Path.GetFileName(savedPath));
             if (parts.Count > 0)
                 Notified?.Invoke($"{image.PixelWidth} × {image.PixelHeight} — " + string.Join(", ", parts));
         }

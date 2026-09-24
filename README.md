@@ -41,11 +41,11 @@ engineer — human or otherwise — than describing a layout in prose.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/home.png" alt="Three capture modes, a delay, and what happens after a capture"></td>
+    <td width="50%"><img src="docs/images/home.png" alt="The home window: Screenshot, Video and Audio across the top, and what to capture underneath"></td>
     <td width="50%"><img src="docs/images/settings.png" alt="Settings, including the colour wheel driving a live preview of the selection border"></td>
   </tr>
   <tr>
-    <td><b>Capture</b> — three modes, not fifteen. Region, window, monitor.</td>
+    <td><b>Home</b> — three things it does: screenshot, video, audio. Pick one, say what, press the button.</td>
     <td><b>Settings</b> — the colour wheel drives a live rehearsal of the real overlay.</td>
   </tr>
 </table>
@@ -139,12 +139,22 @@ staying behind at their original size, which is the part most tools get wrong.
 
 ## Recording
 
-<p align="center">
-  <img src="docs/images/record-setup.png" width="640" alt="Recording setup: what to record, which audio sources, and the quality">
-</p>
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/home-video.png" alt="The home window on Video: region, window or full screen, and which sound to record"></td>
+    <td width="50%"><img src="docs/images/home-audio.png" alt="The home window on Audio: system audio and the microphone, each with its device"></td>
+  </tr>
+  <tr>
+    <td><b>Video</b> — a region, a window or the full screen, with the sound you choose.</td>
+    <td><b>Audio</b> — the same two sources, and no picture at all.</td>
+  </tr>
+</table>
 
-Full screen, one display, one application, or a region. H.264 to MP4 through
-ffmpeg, with the cursor optional.
+A region you drag, a window you click, or the display under the pointer. H.264
+to MP4 through ffmpeg, with the cursor optional. Region and window are picked on
+the same overlay screenshots use, with **Start recording** where Copy and Save
+would be; full screen starts straight away, because there is nothing left to
+choose.
 
 The audio is the interesting part. System audio and the microphone are captured
 through WASAPI and mixed **in this process** into a single continuous 48 kHz
@@ -165,9 +175,45 @@ than skipping: the encoder is being fed a constant frame rate, so a skipped fram
 does not cost detail, it shortens the file and plays the recording back faster
 than it happened.
 
-The control bar carries the same switches as the setup screen, and sets
+The control bar carries the same switches as the home window, and sets
 `WDA_EXCLUDEFROMCAPTURE` on itself, so it is invisible to every capture API on
 the machine — including this recorder. It cannot film itself.
+
+**Pause** leaves the paused stretch out of the file. The frame pump and the
+audio mixer each stop their own clock while paused, so they pick up again
+together: an eight-second take with two seconds paused in the middle comes out
+as 181 frames, 6.03 s of video beside 6.01 s of audio.
+
+### Sound on its own
+
+Plenty of recordings do not need a picture. The one that prompted this is a
+lecture given over slides: a screenshot of every slide, the call's sound
+recorded underneath, and the two put together afterwards in an editor. The
+slides are sharp because they are screenshots, and nobody has to store, upload
+or download an hour of 4K video of something that changed forty times.
+
+**Audio** records system audio, the microphone, or both, into one file. It is the
+same in-process mixer the video uses, so it has the same property: either source
+can be switched on or off from the recording bar in the middle of a take, and the
+track carries on without a gap. System audio can come from a particular output
+rather than the default one, which matters when the call is playing through a
+headset and everything else through the speakers.
+
+Each kind of output has a folder of its own, in the Windows library it belongs
+to — `Pictures\KAM Capture Tool\Screenshots`, `Videos\KAM Capture Tool\Recordings`
+and `Music\KAM Capture Tool\Audio` — and a button of its own on the home window:
+**Open Screenshots**, **Open Video**, **Open Audio**.
+
+| Format | An hour is | Trade-off |
+|---|---|---|
+| MP3, 192 kbps — the default | 86 MB | Opens in anything, and a take cut off by a crash is still playable up to the cut |
+| M4A, AAC 128 kbps | 58 MB | Two thirds the size, but a take that is cut off before it is stopped cannot be opened |
+| WAV, 48 kHz 16-bit | 691 MB | Uncompressed, for sound that is going to be worked on |
+
+The sizes are arithmetic from the bit rates. Measured, an eight-second take
+paused for two comes out at 6.14 s as MP3, 6.09 s as M4A and 6.12 s as WAV, all
+48 kHz stereo. MP3 needs an ffmpeg built with LAME; the usual winget build has
+it, and one that does not gets M4A instead, with a notice saying so.
 
 ## The tool never appears in its own output
 
@@ -212,10 +258,32 @@ running*; the rest of the time it stays visible to other capture tools, because
 making this application unphotographable would be an odd thing to do to someone
 who wants to show you a bug in it.
 
+## Nothing cut off
+
+A window with a fixed size and text that changes will eventually be asked to
+hold more than it has room for. `--layoutcheck` lays out every window offscreen
+at its real size and at the smallest it can be resized to, in the states that
+stretch it — each annotator tool, a recording running, a long status message,
+an update waiting, a headset with a very long name — and fails if anything is
+drawn outside the space it was given. Text that ends in an ellipsis on purpose
+is listed, not failed.
+
+Its first run found three things, all real:
+
+| Where | What was cut off |
+|---|---|
+| The installer | The **Browse** button, pushed 15 px past the edge of the window |
+| Settings, at its narrowest | Six controls — three Browse buttons, two shortcut boxes, a label — by 5 to 25 px |
+| The annotator, at its shortest | The last four tools — marker, symbols, redact, crop — by up to 141 px |
+
+The installer's folder box now takes whatever the button leaves, Settings can no
+longer be made narrower than its rows, and the annotator no longer shorter than
+its tool rail. The check needs no display, so it runs in CI.
+
 ## What this is not
 
-- **Not a video editor.** It records and saves a file. Trimming belongs
-  elsewhere.
+- **Not a video editor.** It records and saves a file. Trimming, and putting
+  slides under a sound track, belong elsewhere.
 - **Not an uploader.** Nothing you capture is sent anywhere. There is no
   account and no telemetry; the one network request is the update check, and
   it can be switched off.
@@ -246,7 +314,7 @@ who wants to show you a bug in it.
                         │
 ┌───────────────────────▼──────────────────────────────────┐
 │  recording — frames via DIB section, audio via WASAPI    │
-│  mixed in-process, both piped to ffmpeg                  │
+│  mixed in-process, piped to ffmpeg; or the audio alone   │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -321,6 +389,10 @@ a gold **Update to x.y.z**
 button and a bar says what changed, with **What's new**, **Not now** and
 **Update now**. If the window is closed, a tray notice says it once.
 
+While it downloads, the button counts up — *Downloading 42%* — and clicking it
+cancels. That is the only progress shown; an earlier version also put a bar
+across the top saying the same thing, and on a small window it was cut off.
+
 **Update now** downloads the new executable, checks it against the SHA-256
 GitHub published for it, and hands over. The running copy closes, the new one
 installs itself into the same folder with the same shortcuts and startup choice,
@@ -342,7 +414,7 @@ and nothing about you or your captures, and it can be switched off in Settings.
 | `Ctrl+Shift+S` | Capture a region |
 | `Ctrl+Shift+W` | Capture a window |
 | `Ctrl+Shift+F` | Capture everything |
-| `Ctrl+Shift+R` | Start or stop recording |
+| `Ctrl+Shift+R` | Record video, or stop whatever is recording |
 
 Inside the annotator: `V` select · `P` pencil · `K` highlighter · `L` line ·
 `A` arrow · `R` rectangle · `O` ellipse · `T` text · `S` numbered marker ·
@@ -354,7 +426,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.2.1. Everything described above is implemented and works.
+Version 1.4.0. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
@@ -365,7 +437,11 @@ Version 1.2.1. Everything described above is implemented and works.
 | Symbol catalogue, 30 glyphs | Done |
 | Select, drag, group, scale | Done |
 | Export at 1x–4x, clipboard, PNG/JPG | Done |
-| Recording with live audio switching | Done |
+| Video recording with live audio switching | Done |
+| Audio-only recording to MP3, M4A or WAV, with the same live switching | Done |
+| Pause that leaves the paused stretch out of the file | Done |
+| A folder and an Open button for each kind of output | Done |
+| Layout check: nothing cut off, in any window, in CI | Done |
 | Self-install, shortcuts, uninstall entry | Done |
 | Updates from GitHub, with a prompt | Done |
 | Global shortcuts, tray | Done |
@@ -379,10 +455,17 @@ The honest gaps:
   capture modes turned out to be the right number; a fourth was clutter.
 - **The interactive editor has no automated tests.** Rendering, grouping and
   export are covered by `--selftest`, which runs in CI; mouse interaction is not.
-- **The live recording controls have not been used in anger.** The pipeline is
-  measured — `--rectest` writes exactly `fps × seconds` frames beside a
-  continuous audio track — but switching microphone mid-take and stopping from
-  the shortcut have only been reasoned about, not exercised end to end.
+- **Audio-only has not been through a real lecture yet.** Video recording has:
+  the microphone switched off mid-take, system audio came through, and the
+  file was right. Audio-only shares that mixer and is measured by
+  `--audiotest`, which switches system audio off and on and pauses in the middle
+  of a take, but an hour-long call is a different test from eight seconds.
+- **The layout check does not cover the capture overlay or the recording bar.**
+  The overlay is drawn in code rather than laid out, and the bar sizes itself to
+  whatever it holds, so neither has an edge to be cut off by in the same sense.
+- **CI does not run the recording tests.** They need ffmpeg and a sound device,
+  so `--rectest` and `--audiotest` are run on a real machine before a release
+  rather than on every push.
 - **The updater has only updated itself in a sandbox so far.** 1.2.0 is the
   first version that has one, so the first real update is the next release.
   Until then the evidence is `scripts/test-update.ps1`, which runs the whole

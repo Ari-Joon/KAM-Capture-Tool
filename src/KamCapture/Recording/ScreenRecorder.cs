@@ -12,7 +12,7 @@ using KamCapture.Settings;
 
 namespace KamCapture.Recording
 {
-    public enum RecordKind { FullScreen, Monitor, Region, Window }
+    public enum RecordKind { FullScreen, Monitor, Region, Window, AudioOnly }
 
     public sealed class RecordTarget
     {
@@ -44,6 +44,13 @@ namespace KamCapture.Recording
         {
             Kind = RecordKind.Region, X = r.X, Y = r.Y, Width = r.Width, Height = r.Height,
             Description = $"Region  ({r.Width} × {r.Height})"
+        };
+
+        /// <summary>No picture at all: system audio, the microphone, or both.</summary>
+        public static RecordTarget AudioOnly() => new()
+        {
+            Kind = RecordKind.AudioOnly,
+            Description = "Audio only"
         };
 
         public static RecordTarget WindowTarget(CapturableWindow w) => new()
@@ -156,6 +163,14 @@ namespace KamCapture.Recording
 
         public RecordTarget Target { get; }
         public string OutputPath { get; }
+
+        public bool IsAudioOnly => Target.Kind == RecordKind.AudioOnly;
+
+        /// <summary>The container actually used, which may differ from the one asked for.</summary>
+        public string AudioFormat { get; } = "mp3";
+
+        /// <summary>Set when the chosen format could not be used, to say so rather than hide it.</summary>
+        public string? FormatNote { get; }
         public bool IsPaused => _paused;
         public TimeSpan Elapsed => _clock.Elapsed - _pausedTotal -
             (_paused ? DateTime.UtcNow - _pauseStarted : TimeSpan.Zero);
@@ -178,24 +193,50 @@ namespace KamCapture.Recording
             Target = target;
             _ffmpeg = ffmpegPath;
 
-            var folder = Services.OutputFolder.Resolve(cfg.RecordFolder, Services.OutputFolder.RecordingsLeaf);
-            if (!string.Equals(folder, cfg.RecordFolder, StringComparison.OrdinalIgnoreCase))
+            // Sound has its own folder; a confirmed OneDrive choice is honoured.
+            var folder = IsAudioOnly ? cfg.EnsureAudioFolder() : cfg.EnsureRecordFolder();
+            string extension = ".mp4";
+            if (IsAudioOnly)
             {
-                cfg.RecordFolder = folder;
-                cfg.Save();
+                AudioFormat = (cfg.AudioFormat ?? "mp3").Trim().ToLowerInvariant() switch
+                {
+                    "m4a" => "m4a",
+                    "wav" => "wav",
+                    _ => "mp3"
+                };
+
+                // MP3 needs libmp3lame, which some ffmpeg builds leave out. M4A
+                // uses ffmpeg's own AAC encoder, which every build has.
+                if (AudioFormat == "mp3" && !FfmpegLocator.HasEncoder(ffmpegPath, "libmp3lame"))
+                {
+                    AudioFormat = "m4a";
+                    FormatNote = "This ffmpeg cannot write MP3, so the audio is saved as M4A.";
+                }
+                extension = "." + AudioFormat;
             }
-            OutputPath = Path.Combine(folder, cfg.BuildFileName(".mp4"));
+
+            // Named to the second, so two recordings started in the same second
+            // would otherwise share a name and the second would replace the first.
+            OutputPath = UI.NameDialog.UniquePath(Path.Combine(folder, cfg.BuildFileName(extension)));
         }
 
         private static int Even(int v) => v % 2 == 0 ? v : v - 1;
 
-        public void Start(bool systemAudio, string? micDeviceId)
+        public void Start(bool systemAudio, string? micDeviceId, string? systemDeviceId = null)
         {
+            if (IsAudioOnly)
+            {
+                StartAudioOnly(systemAudio, micDeviceId, systemDeviceId);
+                return;
+            }
+
             int w = Even(Math.Max(2, Target.Width));
             int h = Even(Math.Max(2, Target.Height));
-            bool wantAudio = systemAudio || micDeviceId != null;
 
-            string? pipeName = wantAudio ? "kam-audio-" + Guid.NewGuid().ToString("N") : null;
+            // The audio track is always there, even when the recording starts
+            // silent. Without it, switching the microphone on half way through
+            // had nowhere to go and quietly recorded nothing.
+            string? pipeName = "kam-audio-" + Guid.NewGuid().ToString("N");
 
             if (pipeName != null)
             {
@@ -239,7 +280,7 @@ namespace KamCapture.Recording
                 var engine = Audio;
                 engine.Failed += m => Failed?.Invoke(m);
 
-                if (systemAudio) engine.AddSystemAudio("system", null, _cfg.SystemAudioGain);
+                if (systemAudio) engine.AddSystemAudio("system", systemDeviceId, _cfg.SystemAudioGain);
                 if (micDeviceId != null) engine.AddMicrophone("mic", micDeviceId, _cfg.MicrophoneGain);
 
                 var pipe = _audioPipe;
@@ -265,6 +306,62 @@ namespace KamCapture.Recording
                 Priority = ThreadPriority.AboveNormal
             };
             _videoThread.Start();
+        }
+
+        /// <summary>
+        /// Sound only. The mix goes straight into ffmpeg's standard input —
+        /// there is no second stream to keep in step, so no pipe is needed —
+        /// and sources can still be switched on and off while it runs, exactly
+        /// as they can during a video.
+        /// </summary>
+        private void StartAudioOnly(bool systemAudio, string? micDeviceId, string? systemDeviceId)
+        {
+            string codec = AudioFormat switch
+            {
+                "wav" => "-c:a pcm_s16le",
+                // AAC holds up at a lower rate than MP3 does, which is the
+                // whole reason to offer it: two thirds the size for the same ear.
+                "m4a" => "-c:a aac -b:a 128k -movflags +faststart",
+                _ => "-c:a libmp3lame -b:a 192k"
+            };
+
+            var args = "-hide_banner -loglevel warning -y " +
+                       "-analyzeduration 0 -probesize 32 " +
+                       $"-f s16le -ar {AudioEngine.SampleRate} -ac {AudioEngine.Channels} -i - " +
+                       $"{codec} \"{OutputPath}\"";
+
+            _proc = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = _ffmpeg,
+                    Arguments = args,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardError = true,
+                    StandardInputEncoding = null
+                },
+                EnableRaisingEvents = true
+            };
+            _proc.ErrorDataReceived += (_, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(e.Data)) Services.Log.Warn("ffmpeg: " + e.Data);
+            };
+
+            _proc.Start();
+            _proc.BeginErrorReadLine();
+
+            var engine = Audio;
+            engine.Failed += m => Failed?.Invoke(m);
+            if (systemAudio) engine.AddSystemAudio("system", systemDeviceId, _cfg.SystemAudioGain);
+            if (micDeviceId != null) engine.AddMicrophone("mic", micDeviceId, _cfg.MicrophoneGain);
+
+            _running = true;
+            _clock.Restart();
+            _pausedTotal = TimeSpan.Zero;
+
+            engine.Start(_proc.StandardInput.BaseStream);
         }
 
         private string BuildArgs(int w, int h, string? pipeName)
@@ -321,10 +418,27 @@ namespace KamCapture.Recording
                 double interval = 1000.0 / Math.Max(1, _cfg.RecordFps);
                 var clock = Stopwatch.StartNew();
                 long frame = 0;
+                TimeSpan pausedTotal = TimeSpan.Zero;
+                TimeSpan? pausedAt = null;
 
                 while (_running)
                 {
-                    long target = (long)(clock.Elapsed.TotalMilliseconds / interval);
+                    // Paused means paused: no frames, and a clock that stops with
+                    // them. The audio writer does the same, so the stretch is
+                    // absent from both tracks and they stay in step.
+                    if (_paused)
+                    {
+                        pausedAt ??= clock.Elapsed;
+                        Thread.Sleep(5);
+                        continue;
+                    }
+                    if (pausedAt != null)
+                    {
+                        pausedTotal += clock.Elapsed - pausedAt.Value;
+                        pausedAt = null;
+                    }
+
+                    long target = (long)((clock.Elapsed - pausedTotal).TotalMilliseconds / interval);
                     if (target <= frame)
                     {
                         Thread.Sleep(1);
@@ -340,8 +454,7 @@ namespace KamCapture.Recording
                         if (ww > 0 && wh > 0) { sx = wx; sy = wy; }
                     }
 
-                    if (!_paused)
-                        grabber.Grab(sx, sy, _cfg.RecordCursor);
+                    grabber.Grab(sx, sy, _cfg.RecordCursor);
 
                     // The encoder is fed a constant frame rate, so every tick of
                     // wall time owes it a frame. When capture cannot keep up the
@@ -378,12 +491,14 @@ namespace KamCapture.Recording
             if (_paused) return;
             _paused = true;
             _pauseStarted = DateTime.UtcNow;
+            _audio?.Pause();
         }
 
         public void Resume()
         {
             if (!_paused) return;
             _pausedTotal += DateTime.UtcNow - _pauseStarted;
+            _audio?.Resume();
             _paused = false;
         }
 

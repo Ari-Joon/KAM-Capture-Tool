@@ -18,16 +18,19 @@ namespace KamCapture.Services
     public static class OutputFolder
     {
         /// <summary>
-        /// Output is grouped under one product folder and split by kind, so
-        /// screenshots and recordings never land in the same pile:
+        /// Output is grouped under one product folder and split by kind, each
+        /// in the Windows library it belongs to, so screenshots, videos and
+        /// sound never land in the same pile:
         ///
         ///   Pictures\KAM Capture Tool\Screenshots
         ///   Videos\KAM Capture Tool\Recordings
+        ///   Music\KAM Capture Tool\Audio
         /// </summary>
         public const string ProductLeaf = "KAM Capture Tool";
 
         public static string CapturesLeaf => Path.Combine(ProductLeaf, "Screenshots");
         public static string RecordingsLeaf => Path.Combine(ProductLeaf, "Recordings");
+        public static string AudioLeaf => Path.Combine(ProductLeaf, "Audio");
 
         /// <summary>The flat folders used before the split, kept only to move off.</summary>
         private static readonly string[] LegacyLeaves = { "KAM Captures", "KAM Recordings" };
@@ -54,6 +57,9 @@ namespace KamCapture.Services
         /// <summary>Videos on this disk, even if the known folder was redirected.</summary>
         public static string LocalVideos() => Local(Environment.SpecialFolder.MyVideos, "Videos");
 
+        /// <summary>Music on this disk, even if the known folder was redirected.</summary>
+        public static string LocalMusic() => Local(Environment.SpecialFolder.MyMusic, "Music");
+
         private static string Local(Environment.SpecialFolder folder, string profileLeaf)
         {
             var known = Environment.GetFolderPath(folder);
@@ -67,6 +73,7 @@ namespace KamCapture.Services
 
         public static string DefaultCaptures() => Path.Combine(LocalPictures(), CapturesLeaf);
         public static string DefaultRecordings() => Path.Combine(LocalVideos(), RecordingsLeaf);
+        public static string DefaultAudio() => Path.Combine(LocalMusic(), AudioLeaf);
 
         /// <summary>True for one of the old flat folders, which should be moved off.</summary>
         public static bool IsLegacyLayout(string? path)

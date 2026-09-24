@@ -84,6 +84,12 @@ namespace KamCapture.Recording
         private Stream? _output;
         private Thread? _writer;
         private volatile bool _running;
+        private volatile bool _paused;
+
+        /// <summary>Sample frames written so far: the length of the track, exactly.</summary>
+        public long FramesWritten { get; private set; }
+
+        public bool IsPaused => _paused;
 
         public event Action<string>? Failed;
 
@@ -213,6 +219,33 @@ namespace KamCapture.Recording
             return true;
         }
 
+        /// <summary>
+        /// Stop writing without ending the track. The writer's clock stops with
+        /// it, so the paused stretch is simply absent from the file.
+        /// </summary>
+        public void Pause()
+        {
+            _paused = true;
+            LastPeak = 0;
+        }
+
+        /// <summary>
+        /// Carry on from where it stopped. Each source kept buffering while
+        /// paused; that audio is thrown away here, or the first seconds after
+        /// resuming would be what was said during the pause.
+        /// </summary>
+        public void Resume()
+        {
+            lock (_lock)
+            {
+                foreach (var s in _sources.Values)
+                {
+                    try { s.Buffer?.ClearBuffer(); } catch { }
+                }
+            }
+            _paused = false;
+        }
+
         public void Remove(string key)
         {
             Source? source;
@@ -250,10 +283,24 @@ namespace KamCapture.Recording
 
             var clock = Stopwatch.StartNew();
             long written = 0;                            // frames emitted so far
+            TimeSpan pausedTotal = TimeSpan.Zero;
+            TimeSpan? pausedAt = null;
 
             while (_running)
             {
-                long due = (long)(clock.Elapsed.TotalSeconds * SampleRate);
+                if (_paused)
+                {
+                    pausedAt ??= clock.Elapsed;
+                    Thread.Sleep(5);
+                    continue;
+                }
+                if (pausedAt != null)
+                {
+                    pausedTotal += clock.Elapsed - pausedAt.Value;
+                    pausedAt = null;
+                }
+
+                long due = (long)((clock.Elapsed - pausedTotal).TotalSeconds * SampleRate);
                 if (due - written < blockFrames)
                 {
                     Thread.Sleep(2);
@@ -292,6 +339,7 @@ namespace KamCapture.Recording
                 }
 
                 written += blockFrames;
+                FramesWritten = written;
             }
 
             try { _output?.Flush(); } catch { }

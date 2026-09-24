@@ -326,7 +326,15 @@
                         </ToggleButton>
                         <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
                                           ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                          Margin="9,0,26,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                                          Margin="9,0,26,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                            <!-- A long device name ends in an ellipsis rather than
+                                 being cut through the middle of a letter. -->
+                            <ContentPresenter.Resources>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                </Style>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
                         <Popup x:Name="PART_Popup" AllowsTransparency="True" Placement="Bottom"
                                IsOpen="{TemplateBinding IsDropDownOpen}" Focusable="False" PopupAnimation="Fade">
                             <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Edge}"

@@ -39,10 +39,15 @@ namespace KamCapture.Capture
         /// </summary>
         public static bool HideFromCapture { get; set; }
 
-        public static CaptureResult Run(SnipMode mode, AppSettings cfg, DesktopSnapshot? snapshot = null)
+        /// <param name="forRecording">
+        /// Choosing what to record rather than what to capture. The bar then
+        /// offers one thing, Start recording, and clicking a window starts it.
+        /// </param>
+        public static CaptureResult Run(SnipMode mode, AppSettings cfg, DesktopSnapshot? snapshot = null,
+                                        bool forRecording = false)
         {
             var snap = snapshot ?? ScreenGrabber.CaptureVirtualDesktop(cfg.IncludeCursor);
-            var state = new OverlayState(snap, cfg, mode);
+            var state = new OverlayState(snap, cfg, mode) { ForRecording = forRecording };
 
             var windows = new List<OverlayWindow>();
             foreach (var m in Screens.All())
@@ -58,7 +63,17 @@ namespace KamCapture.Capture
             {
                 state.Selection = new Rect(snap.OriginX, snap.OriginY, snap.Width, snap.Height);
                 state.Settled = true;
-                state.Commit(CaptureAction.Edit);
+                state.Commit(state.PrimaryAction);
+            }
+            else if (mode == SnipMode.Monitor)
+            {
+                // Full screen means the display under the pointer, taken at
+                // once; asking for a click on it would confirm a choice
+                // already made.
+                var m = Screens.FromCursor();
+                state.Selection = new Rect(m.X, m.Y, m.Width, m.Height);
+                state.Settled = true;
+                state.Commit(state.PrimaryAction);
             }
 
             var frame = new DispatcherFrame();
@@ -81,6 +96,10 @@ namespace KamCapture.Capture
         public DesktopSnapshot Snap { get; }
         public AppSettings Cfg { get; }
         public SnipMode Mode { get; set; }
+        public bool ForRecording { get; init; }
+
+        /// <summary>What committing the selection means: annotate a capture, or start recording it.</summary>
+        public CaptureAction PrimaryAction => ForRecording ? CaptureAction.Record : CaptureAction.Edit;
         public CaptureResult Result { get; } = new CaptureResult();
         public List<OverlayWindow> AllWindows { get; set; } = new();
 
@@ -252,16 +271,16 @@ namespace KamCapture.Capture
                     break;
 
                 case Key.Enter:
-                    if (_state.Selection.Width >= 1) _state.Commit(CaptureAction.Edit);
+                    if (_state.Selection.Width >= 1) _state.Commit(_state.PrimaryAction);
                     e.Handled = true;
                     break;
 
-                case Key.C when Keyboard.Modifiers == ModifierKeys.Control:
+                case Key.C when Keyboard.Modifiers == ModifierKeys.Control && !_state.ForRecording:
                     if (_state.Selection.Width >= 1) _state.Commit(CaptureAction.Copy);
                     e.Handled = true;
                     break;
 
-                case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
+                case Key.S when Keyboard.Modifiers == ModifierKeys.Control && !_state.ForRecording:
                     if (_state.Selection.Width >= 1) _state.Commit(CaptureAction.Save);
                     e.Handled = true;
                     break;

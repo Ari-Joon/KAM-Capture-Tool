@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="KAM Capture Tool — Settings" Height="700" Width="660"
-        MinHeight="500" MinWidth="620"
+        MinHeight="500" MinWidth="660"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource Navy}"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
@@ -164,19 +164,32 @@
                         </StackPanel>
 
                         <StackPanel Style="{StaticResource Row}">
-                            <TextBlock Style="{StaticResource RowLabel}" Text="Save to"/>
+                            <TextBlock Style="{StaticResource RowLabel}" Text=""/>
+                            <CheckBox x:Name="ChkRecordCursor" Content="Record the cursor" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource RowLabel}" Text="Videos to"/>
                             <TextBox x:Name="TxtRecordFolder" Width="330" VerticalAlignment="Center"/>
                             <Button Content="Browse" Margin="8,0,0,0" Click="OnBrowseRecordFolder"/>
                         </StackPanel>
 
-                        <StackPanel Style="{StaticResource Row}" Margin="0,0,0,6">
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource RowLabel}" Text="Audio to"/>
+                            <TextBox x:Name="TxtAudioFolder" Width="330" VerticalAlignment="Center"/>
+                            <Button Content="Browse" Margin="8,0,0,0" Click="OnBrowseAudioFolder"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}">
+                            <TextBlock Style="{StaticResource RowLabel}" Text="Audio format"/>
+                            <ComboBox x:Name="CmbAudioFormat" Width="230" VerticalAlignment="Center"
+                                      ToolTip="The file an audio-only recording is saved as"/>
+                        </StackPanel>
+
+                        <StackPanel Style="{StaticResource Row}" Margin="0">
                             <TextBlock Style="{StaticResource RowLabel}" Text="ffmpeg"/>
                             <TextBox x:Name="TxtFfmpeg" Width="330" VerticalAlignment="Center"/>
                             <Button Content="Find" Margin="8,0,0,0" Click="OnFindFfmpeg"/>
-                        </StackPanel>
-                        <StackPanel Style="{StaticResource Row}" Margin="0">
-                            <TextBlock Style="{StaticResource RowLabel}" Text=""/>
-                            <CheckBox x:Name="ChkRecordCursor" Content="Record the cursor" VerticalAlignment="Center"/>
                         </StackPanel>
                         <TextBlock x:Name="LblFfmpegState" Style="{StaticResource Label}" Margin="110,8,0,0" TextWrapping="Wrap"/>
                     </StackPanel>

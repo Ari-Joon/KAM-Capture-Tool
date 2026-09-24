@@ -25,7 +25,7 @@
             <Border Width="1" Background="{StaticResource Edge}" Margin="12,3"/>
 
             <Button x:Name="BtnPause" Content="Pause" MinWidth="70" Click="OnPause"
-                    ToolTip="Pause the recording"/>
+                    ToolTip="Pause. The paused stretch is left out of the file."/>
             <Button x:Name="BtnStop" Style="{StaticResource PrimaryButton}" Content="Stop"
                     Margin="6,0,0,0" MinWidth="70" Click="OnStop" ToolTip="Finish and save"/>
 
@@ -62,8 +62,14 @@
 
             <Border Background="#FF121216" CornerRadius="3" Width="6" Height="26" Margin="8,0,0,0"
                     VerticalAlignment="Center">
-                <Border x:Name="Meter" Background="#FF2BB673" CornerRadius="3" Height="0"
-                        VerticalAlignment="Bottom"/>
+                <!-- Scaled, never resized: a height change every tick would be a
+                     layout pass ten times a second during a recording. -->
+                <Border x:Name="Meter" Background="#FF2BB673" CornerRadius="3" Height="26"
+                        VerticalAlignment="Bottom" RenderTransformOrigin="0.5,1">
+                    <Border.RenderTransform>
+                        <ScaleTransform x:Name="MeterScale" ScaleX="1" ScaleY="0"/>
+                    </Border.RenderTransform>
+                </Border>
             </Border>
 
             <Border Width="1" Background="{StaticResource Edge}" Margin="12,3"/>

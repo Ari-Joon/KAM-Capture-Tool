@@ -30,10 +30,15 @@
                 <TextBlock Style="{StaticResource Label}" Margin="0,4,0,12" TextWrapping="Wrap"
                            Text="The default needs no administrator rights. Anywhere you can write to will do."/>
 
-                <StackPanel Orientation="Horizontal">
-                    <TextBox x:Name="TxtFolder" Width="446" VerticalAlignment="Center"/>
-                    <Button Content="Browse…" Margin="8,0,0,0" Click="OnBrowse"/>
-                </StackPanel>
+                <!-- The box takes what the button leaves, so the button is never pushed off the edge. -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="TxtFolder" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Click="OnBrowse"/>
+                </Grid>
 
                 <TextBlock x:Name="LblSpace" Style="{StaticResource Label}" Margin="0,8,0,0"/>
 

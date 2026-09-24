@@ -86,6 +86,13 @@ namespace KamCapture.UI
                 new Item("1x", 1), new Item("2x", 2), new Item("3x", 3), new Item("4x", 4),
             };
 
+            CmbAudioFormat.ItemsSource = new[]
+            {
+                new Item("MP3 — opens anywhere", "mp3"),
+                new Item("M4A — smaller", "m4a"),
+                new Item("WAV — uncompressed", "wav"),
+            };
+
             CmbFps.ItemsSource = new[]
             {
                 new Item("15 fps", 15), new Item("24 fps", 24), new Item("30 fps", 30),
@@ -146,7 +153,9 @@ namespace KamCapture.UI
             Select(CmbFps, c.RecordFps);
             SldQuality.Value = c.RecordQuality;
             ChkRecordCursor.IsChecked = c.RecordCursor;
+            Select(CmbAudioFormat, c.AudioFormat);
             TxtRecordFolder.Text = c.RecordFolder;
+            TxtAudioFolder.Text = c.AudioFolder;
             TxtFfmpeg.Text = c.FfmpegPath;
 
             ChkHotkeys.IsChecked = c.HotkeysEnabled;
@@ -233,6 +242,7 @@ namespace KamCapture.UI
 
         private void OnBrowseSaveFolder(object sender, RoutedEventArgs e) => Browse(TxtSaveFolder);
         private void OnBrowseRecordFolder(object sender, RoutedEventArgs e) => Browse(TxtRecordFolder);
+        private void OnBrowseAudioFolder(object sender, RoutedEventArgs e) => Browse(TxtAudioFolder);
 
         private void Browse(TextBox target)
         {
@@ -327,12 +337,14 @@ namespace KamCapture.UI
             if (CmbFps.SelectedItem is Item { Value: int fps }) c.RecordFps = fps;
             c.RecordQuality = (int)Math.Round(SldQuality.Value);
             c.RecordCursor = ChkRecordCursor.IsChecked == true;
+            if (CmbAudioFormat.SelectedItem is Item { Value: string fmt }) c.AudioFormat = fmt;
             c.RecordFolder = ChooseFolder(TxtRecordFolder, OutputFolder.DefaultRecordings());
+            c.AudioFolder = ChooseFolder(TxtAudioFolder, OutputFolder.DefaultAudio());
 
             // Keep confirmations only for folders still in use, so an old yes
             // cannot silently apply to a folder picked again months later.
             c.ConfirmedSyncedFolders = new List<string>();
-            foreach (var f in new[] { c.SaveFolder, c.RecordFolder })
+            foreach (var f in new[] { c.SaveFolder, c.RecordFolder, c.AudioFolder })
                 if (OutputFolder.IsSynced(f) && AppSettings.Normalise(f) is { } key && _confirmed.Contains(key))
                     c.ConfirmedSyncedFolders.Add(key);
             c.FfmpegPath = TxtFfmpeg.Text.Trim();
@@ -379,6 +391,7 @@ namespace KamCapture.UI
             // Keep the folders they chose; defaults should not relocate their files.
             d.SaveFolder = _cfg.SaveFolder;
             d.RecordFolder = _cfg.RecordFolder;
+            d.AudioFolder = _cfg.AudioFolder;
             d.FfmpegPath = _cfg.FfmpegPath;
             LoadFrom(d);
 

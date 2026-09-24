@@ -17,6 +17,47 @@ namespace KamCapture.Recording
             return Discover();
         }
 
+        private static readonly Dictionary<string, HashSet<string>> Encoders = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Whether this ffmpeg was built with an encoder. Builds differ — MP3
+        /// needs libmp3lame, which minimal builds leave out — so ask rather
+        /// than find out from a recording that never started. Asked once.
+        /// </summary>
+        public static bool HasEncoder(string ffmpeg, string name)
+        {
+            lock (Encoders)
+            {
+                if (!Encoders.TryGetValue(ffmpeg, out var known))
+                {
+                    known = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    try
+                    {
+                        using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = ffmpeg,
+                            Arguments = "-hide_banner -encoders",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true
+                        });
+                        var text = p!.StandardOutput.ReadToEnd();
+                        p.WaitForExit(5000);
+
+                        // Lines look like " A....D libmp3lame   libmp3lame MP3 ...".
+                        foreach (var line in text.Split('\n'))
+                        {
+                            var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length >= 2 && parts[0].Length == 6) known.Add(parts[1]);
+                        }
+                    }
+                    catch { /* treat as unknown: the caller falls back */ }
+                    Encoders[ffmpeg] = known;
+                }
+                return known.Contains(name);
+            }
+        }
+
         public static string? Discover()
         {
             foreach (var candidate in Candidates())

@@ -45,6 +45,33 @@ all, and fails if the frame count is short of the wall clock. A correct run
 writes exactly `fps x seconds` frames. Check the result with ffprobe: the video
 duration should match the seconds you asked for, not be shorter.
 
+Add a third number to pause for that many seconds in the middle of the take:
+`--rectest=out.mp4,8,2` should come out at six seconds of video and six of audio,
+side by side.
+
+Sound on its own has the same kind of check:
+
+```powershell
+dotnet run --project src/KamCapture -- --audiotest=out.mp3,8,2
+```
+
+The extension picks the format — `.mp3`, `.m4a` or `.wav`. It records system
+audio, switches it off and on again part-way through, pauses if asked, and fails
+if the sound written is more than 0.35 s away from the time that was not
+paused.
+
+Layout has a check of its own, which also runs in CI:
+
+```powershell
+dotnet run --project src/KamCapture -- --layoutcheck=layout
+```
+
+It lays out every window offscreen at its real size and its smallest, in the
+states that stretch it — each annotator tool, a recording running, a long status
+message, an update waiting, long device names — and fails if any element is
+drawn outside the space it was given. A PNG of each state lands in the folder,
+to look at as well. Add a state here when a window gains one.
+
 The rest run on your machine rather than in CI:
 
 | Check | What it proves |

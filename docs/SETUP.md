@@ -24,6 +24,8 @@ signed. *More info* then *Run anyway*.
 | `--tray` | Start hidden in the notification area |
 | `--portable` | Skip the install prompt for this run |
 | `--capture=Region` | Take a capture immediately (`Region`, `Window`, `Monitor`, `FullScreen`) |
+| `--record` | Record video as the home window is set up, or stop the recording that is running |
+| `--record-audio` | Record sound only, as the home window is set up, or stop the recording that is running |
 | `--update` | Check GitHub and, if there is a newer version, install it and restart |
 | `--apply-update` | Used by the updater: install this copy over the running one, then start it |
 | `--install-silent` | Install with no interface. Over an existing install it updates it in place, keeping its folder, the shortcuts still there, and start-with-Windows; otherwise the default folder with both shortcuts |
@@ -34,11 +36,13 @@ signed. *More info* then *Run anyway*.
 | `--foldertest` | Check the OneDrive rules in a scratch folder; touches nothing real |
 | `--lifecycletest` | Check windows come back after a capture; opens windows briefly |
 | `--ghosttest` | Measure how much of a hidden window leaks into a grab; flashes a window |
-| `--savetest` | Walk the Save path end to end and report where it breaks |
+| `--savetest` | Walk the Save path end to end and report where it breaks; the sample it writes is removed again |
 | `--installtest` | Check install and update against a scratch registry key and folders; touches nothing real |
 | `--updatetest` | Check version comparison, reading a release, checksum refusal and the program swap; no network |
-| `--rectest=<file>,<seconds>` | Record a small region headlessly and check the frame count |
+| `--rectest=<file>,<seconds>[,<pause>]` | Record a small region headlessly and check the frame count; with a pause, check the paused stretch is left out |
+| `--audiotest=<file>,<seconds>[,<pause>]` | Record sound only to `.mp3`, `.m4a` or `.wav`, switching system audio off and on mid-take, and check the length |
 | `--docshots=<dir>` | Render the windows to PNGs offscreen, for documentation |
+| `--layoutcheck[=<dir>]` | Lay out every window offscreen, in the states that stretch it, and fail if anything is cut off; writes a PNG of each state |
 
 The checks run alongside a copy that is already in the tray. Setup commands
 (`--install-silent`, `--uninstall`, `--apply-update`) ask a running copy to close first, since an
@@ -56,6 +60,32 @@ Captures and recordings are never touched. Settings stay in
 `%APPDATA%\KAM Capture Tool` in case you reinstall; delete that folder to remove
 them too.
 
+## The home window
+
+Three things across the top, and what each one needs underneath it.
+
+| | What | Sound | The button |
+|---|---|---|---|
+| **Screenshot** | Region, Window or Full screen, and a delay | — | Take screenshot |
+| **Video** | Region, Window or Full screen | System audio and the microphone, each with its device | Start recording |
+| **Audio** | — | System audio and the microphone, each with its device | Start recording audio |
+
+**Region** is dragged on the overlay, **Window** is a click on the window, and
+**Full screen** is the display under the pointer, taken without a click.
+Screenshot and Video each remember their own choice, so a habit of recording the
+full screen does not change what a screenshot does. The sound choices are shared
+by Video and Audio. While a recording runs, the button becomes **Stop recording**.
+
+Underneath the button is one line: what just happened — *Audio saved as
+KAM-2026-09-24-10-15-22.mp3, 86.4 MB* — and otherwise the shortcut for what is
+selected. Along the bottom, **Open Screenshots**, **Open Video** and **Open
+Audio** each open their own folder, whatever you did last. Hover one to see
+where it points.
+
+The tray menu has the same things in the same words — *Screenshot a region*,
+*Screenshot a window*, *Screenshot the full screen*, *Record video*, *Record
+audio* — and the recording item reads *Stop recording* while one is running.
+
 ## Updates
 
 The circular arrow at the top right of the home window checks GitHub for a newer
@@ -67,6 +97,9 @@ was up, that one check waits for the connection. When there is one:
 |---|---|
 | Home window | The arrow becomes a gold **Update to x.y.z** button, and a bar offers **What's new**, **Not now** and **Update now** |
 | Tray | A notice, once per version, and **Update to x.y.z…** at the top of the menu |
+
+While it downloads, the gold button counts it up — *Downloading 42%* — and that
+is the only progress shown; clicking it cancels the download.
 
 **Update now** downloads `KamCapture.exe` from the release into
 `%TEMP%\KAM Capture Tool\Updates`, checks its SHA-256 against the digest GitHub
@@ -88,8 +121,8 @@ arrow still checks.
 
 ## Recording prerequisites
 
-Video recording shells out to ffmpeg for H.264 encoding. Everything else works
-without it.
+Recording shells out to ffmpeg: H.264 for video, and MP3, AAC or plain PCM for
+sound on its own. Everything else works without it.
 
 ```powershell
 winget install Gyan.FFmpeg
@@ -106,7 +139,8 @@ executable, or wherever you point it in Settings.
 | `%APPDATA%\KAM Capture Tool\kam-capture.log` | A short rolling log, trimmed at 512 KB |
 | `%TEMP%\KAM Capture Tool\Updates` | A downloaded update, deleted once it is installed |
 | `Pictures\KAM Capture Tool\Screenshots` | Saved captures, by default |
-| `Videos\KAM Capture Tool\Recordings` | Saved recordings, by default |
+| `Videos\KAM Capture Tool\Recordings` | Saved videos, by default |
+| `Music\KAM Capture Tool\Audio` | Saved audio-only recordings, by default |
 
 Nothing is written anywhere else. The only thing sent anywhere is the update
 check, described above.
@@ -131,7 +165,7 @@ silently failing.
 | `Ctrl+Shift+S` | Capture a region |
 | `Ctrl+Shift+W` | Capture a window |
 | `Ctrl+Shift+F` | Capture everything |
-| `Ctrl+Shift+R` | Start or stop recording |
+| `Ctrl+Shift+R` | Record video, or stop whatever is recording |
 
 ## While selecting
 
@@ -152,6 +186,10 @@ silently failing.
 
 After releasing the mouse a small bar appears: **Annotate**, **Copy**, **Save**,
 **Record** (records that exact region), **Cancel**.
+
+When the overlay was opened to record a video, the bar is **Start recording** and
+**Cancel**, `Enter` or a double-click starts it, and in window mode the click on
+the window is the decision — the recording starts there and then.
 
 ## In the annotator
 
@@ -224,13 +262,18 @@ list in the margin:
 
 ## Recording
 
-Set the target and the audio before you start, or change the audio while it runs
-— the control bar carries the same switches. Switching microphone mid-recording
-does not interrupt the file: the mixer's output stream keeps running, so the
-audio track stays continuous and in sync.
+Choose **Video** or **Audio** on the home window, set the sound, and press the
+button. A small control bar appears with the same switches, so a source can be
+added, dropped or turned up while it runs. Switching mid-recording does not
+interrupt the file: the mixer's output stream keeps running, so the audio track
+stays continuous and in sync.
+
+**Pause** leaves the paused stretch out of the file, picture and sound alike.
 
 The control bar never appears in the recording. Neither does the selection
 overlay while a recording is in progress.
+
+### Video
 
 | Setting | Notes |
 |---|---|
@@ -238,6 +281,35 @@ overlay while a recording is in progress.
 | Quality | x264 CRF, 14 (near-lossless) to 30 (small). 20 is the default. |
 | Encoder | Automatic uses libx264. Pick a hardware encoder if you have one. |
 | Cursor | Optional, drawn into each frame. |
+
+### Audio only
+
+| Setting | Notes |
+|---|---|
+| Format | Settings → Recording → Audio only. MP3 at 192 kbps (the default), M4A at AAC 128 kbps, or WAV. |
+| System audio device | The output to record from, on the home window. Pick the one the call plays through if it is not the default — a headset, say. |
+
+MP3 is the default because a take that is cut off — a crash, a flat battery — is
+still playable up to the cut. An M4A that was never stopped properly cannot be
+opened at all. If the ffmpeg in use has no MP3 encoder, the file is saved as M4A
+and a notice says so. Audio has a folder of its own, `Music\KAM Capture
+Tool\Audio`, changed in Settings → Recording → Audio to.
+
+### A lecture over slides
+
+The case audio-only was built for: every slide as a sharp screenshot, the call's
+sound underneath, put together afterwards in an editor.
+
+1. Settings → Capture → Afterwards: tick **Save a PNG straight away**, untick
+   **Open the annotator**. Each screenshot is then one keypress and no windows.
+2. On the home window, **Audio**, with **System audio** set to the output the call
+   plays through. Add the microphone if your own voice belongs in it.
+3. Start recording audio, then press `Ctrl+Shift+F` on each new slide. It takes
+   everything on screen — on more than one display, all of them — and the
+   home window stays where it was rather than jumping in front of the call.
+
+Screenshots are named to the second, and one taken in the same second as the
+last is saved as `…-2` rather than replacing it.
 
 ## Troubleshooting
 

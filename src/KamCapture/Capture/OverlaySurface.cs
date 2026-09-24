@@ -69,7 +69,7 @@ namespace KamCapture.Capture
 
             if (e.ClickCount == 2 && _s.Selection.Width >= 1)
             {
-                _s.Commit(CaptureAction.Edit);
+                _s.Commit(_s.PrimaryAction);
                 return;
             }
 
@@ -110,6 +110,12 @@ namespace KamCapture.Capture
                 {
                     _s.Selection = new Rect(_s.HoverWindow.X, _s.HoverWindow.Y,
                                             _s.HoverWindow.Width, _s.HoverWindow.Height);
+
+                    // Recording a window: the click is the decision. There is
+                    // nothing to adjust, so a second confirmation would only be
+                    // a second click.
+                    if (_s.ForRecording) { _s.Commit(CaptureAction.Record); return; }
+
                     _s.Settled = true;
                     _s.Invalidate();
                 }
@@ -454,11 +460,16 @@ namespace KamCapture.Capture
                 SnipMode.Monitor => "Monitor",
                 _ => "Region"
             };
-            string text = _s.Mode == SnipMode.Window
-                ? "Click a window to capture it     C capture  ·  M magnifier  ·  Esc cancel"
-                : "Drag to select     Ctrl+A whole screen  ·  W window  ·  M magnifier  ·  Esc cancel";
+            string text = (_s.ForRecording, _s.Mode == SnipMode.Window) switch
+            {
+                (true, true) => "Click the window to record it     Esc cancel",
+                (true, false) => "Drag the area to record, then Start recording     Ctrl+A whole screen  ·  Esc cancel",
+                (false, true) => "Click a window to capture it     C capture  ·  M magnifier  ·  Esc cancel",
+                _ => "Drag to select     Ctrl+A whole screen  ·  W window  ·  M magnifier  ·  Esc cancel"
+            };
 
-            var title = Text($"KAM Capture — {mode}", 15 * U, Brushes.White, true);
+            var title = Text(_s.ForRecording ? $"KAM Capture — record a {mode.ToLowerInvariant()}" : $"KAM Capture — {mode}",
+                             15 * U, Brushes.White, true);
             var body = Text(text, 12.5 * U, new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0x94)), false);
 
             double padX = 18 * U, padY = 13 * U, gap = 5 * U;
@@ -531,14 +542,20 @@ namespace KamCapture.Capture
         {
             _bar.Clear();
 
-            var items = new (CaptureAction Action, string Label)[]
-            {
-                (CaptureAction.Edit,   "Annotate"),
-                (CaptureAction.Copy,   "Copy"),
-                (CaptureAction.Save,   "Save"),
-                (CaptureAction.Record, "Record"),
-                (CaptureAction.Cancel, "Cancel"),
-            };
+            var items = _s.ForRecording
+                ? new (CaptureAction Action, string Label)[]
+                {
+                    (CaptureAction.Record, "Start recording"),
+                    (CaptureAction.Cancel, "Cancel"),
+                }
+                : new (CaptureAction Action, string Label)[]
+                {
+                    (CaptureAction.Edit,   "Annotate"),
+                    (CaptureAction.Copy,   "Copy"),
+                    (CaptureAction.Save,   "Save"),
+                    (CaptureAction.Record, "Record"),
+                    (CaptureAction.Cancel, "Cancel"),
+                };
 
             double h = 34 * U, padX = 13 * U, gap = 4 * U, edgePad = 5 * U;
             var texts = new List<FormattedText>();

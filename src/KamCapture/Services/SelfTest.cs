@@ -81,7 +81,7 @@ namespace KamCapture.Services
         /// prove the frame pump, the audio mixer and the ffmpeg pipeline
         /// actually produce a playable file.
         /// </summary>
-        public static int RecordTest(string outputPath, int seconds)
+        public static int RecordTest(string outputPath, int seconds, int pauseSeconds = 0)
         {
             try
             {
@@ -100,12 +100,12 @@ namespace KamCapture.Services
                 string? failure = null;
                 recorder.Failed += m => failure ??= m;
 
-                Say($"recording {seconds}s of 640x360 to {recorder.OutputPath}");
+                Say($"recording {seconds}s of 640x360 to {recorder.OutputPath}" +
+                    (pauseSeconds > 0 ? $", paused for {pauseSeconds}s in the middle" : ""));
                 recorder.Start(systemAudio: true, micDeviceId: null);
                 Say("  started");
 
-                var end = DateTime.UtcNow.AddSeconds(seconds);
-                while (DateTime.UtcNow < end) System.Threading.Thread.Sleep(100);
+                RunWithPause(seconds, pauseSeconds, recorder.Pause, recorder.Resume);
 
                 Say("  stopping");
                 string? path = null;
@@ -121,14 +121,107 @@ namespace KamCapture.Services
                 Say($"  file: {path} ({bytes / 1024.0:0} KB)");
                 if (bytes < 4096) return Fail("output file is suspiciously small");
 
-                double expected = seconds * 30 * 0.6;
-                if (recorder.FramesWritten < expected)
-                    return Fail($"only {recorder.FramesWritten} frames in {seconds}s");
+                // A pause must leave its stretch out of the file, not fill it.
+                double expected = (seconds - pauseSeconds) * 30.0;
+                if (recorder.FramesWritten < expected * 0.9 || recorder.FramesWritten > expected * 1.1 + 2)
+                    return Fail($"{recorder.FramesWritten} frames, expected about {expected:0}");
 
                 Say("record-test OK");
                 return 0;
             }
             catch (Exception ex) { return Fail(ex.ToString()); }
+        }
+
+        /// <summary>
+        /// Record sound only, with no interface: switch system audio off and on
+        /// part way through, pause in the middle, then check the track is exactly
+        /// as long as the time actually recorded — no gap where the source was
+        /// off, and no paused stretch.
+        /// </summary>
+        public static int AudioTest(string outputPath, int seconds, int pauseSeconds = 0)
+        {
+            var cfg = Settings.AppSettings.Load();
+            var keepFolder = cfg.AudioFolder;
+            var keepTemplate = cfg.FileNameTemplate;
+            var keepFormat = cfg.AudioFormat;
+            try
+            {
+                var ffmpeg = Recording.FfmpegLocator.Resolve(null);
+                if (ffmpeg == null) return Fail("ffmpeg not found");
+
+                cfg.AudioFolder = Path.GetDirectoryName(Path.GetFullPath(outputPath))!;
+                cfg.FileNameTemplate = Path.GetFileNameWithoutExtension(outputPath);
+                cfg.AudioFormat = Path.GetExtension(outputPath).TrimStart('.');
+
+                using var recorder = new Recording.ScreenRecorder(cfg, Recording.RecordTarget.AudioOnly(), ffmpeg);
+                string? failure = null;
+                recorder.Failed += m => failure ??= m;
+
+                Say($"recording {seconds}s of audio to {recorder.OutputPath}" +
+                    (pauseSeconds > 0 ? $", paused for {pauseSeconds}s" : ""));
+                if (recorder.FormatNote != null) Say("  " + recorder.FormatNote);
+                recorder.Start(systemAudio: true, micDeviceId: null);
+
+                // Switch system audio off and back on, as the bar's toggle does.
+                System.Threading.Thread.Sleep(700);
+                recorder.Audio.Remove("system");
+                Say("  system audio off");
+                System.Threading.Thread.Sleep(500);
+                recorder.Audio.AddSystemAudio("system", null, 1.0);
+                Say("  system audio on");
+
+                RunWithPause(seconds - 1.2, pauseSeconds, recorder.Pause, recorder.Resume);
+
+                string? path = null;
+                var stopped = Task.Run(() => path = recorder.Stop());
+                if (!stopped.Wait(TimeSpan.FromSeconds(30)))
+                    return Fail("Stop() did not return within 30s");
+                if (failure != null) Say("  reported: " + failure);
+
+                double recorded = recorder.Audio.FramesWritten / (double)Recording.AudioEngine.SampleRate;
+                double expected = seconds - pauseSeconds;
+                Say($"  track length: {recorded:0.00}s, expected {expected:0.00}s");
+
+                if (path == null || !File.Exists(path)) return Fail("no output file");
+                var bytes = new FileInfo(path).Length;
+                Say($"  file: {path} ({bytes / 1024.0:0} KB)");
+                if (bytes < 1024) return Fail("output file is suspiciously small");
+
+                if (Math.Abs(recorded - expected) > 0.35)
+                    return Fail($"track is {recorded:0.00}s, expected {expected:0.00}s");
+
+                Say("audio-test OK");
+                return 0;
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+            finally
+            {
+                cfg.AudioFolder = keepFolder;
+                cfg.FileNameTemplate = keepTemplate;
+                cfg.AudioFormat = keepFormat;
+            }
+        }
+
+        /// <summary>Wait out a recording, pausing for a stretch in the middle of it.</summary>
+        private static void RunWithPause(double seconds, int pauseSeconds, Action pause, Action resume)
+        {
+            double running = Math.Max(0, seconds - pauseSeconds);
+            Wait(running / 2);
+            if (pauseSeconds > 0)
+            {
+                pause();
+                Say("  paused");
+                Wait(pauseSeconds);
+                resume();
+                Say("  resumed");
+            }
+            Wait(running / 2);
+        }
+
+        private static void Wait(double seconds)
+        {
+            var end = DateTime.UtcNow.AddSeconds(seconds);
+            while (DateTime.UtcNow < end) System.Threading.Thread.Sleep(20);
         }
 
         /// <summary>Walk the exact path the Save button takes, and report where it breaks.</summary>
@@ -151,11 +244,16 @@ namespace KamCapture.Services
                 var name = cfg.BuildFileName(".png");
                 Say("file name   : " + name);
 
-                var path = Path.Combine(cfg.SaveFolder, name);
+                // The real folder, because that is what is being tested — but a
+                // name no capture already has, and gone again afterwards, so
+                // the sample never turns up among someone's screenshots.
+                var path = UI.NameDialog.UniquePath(Path.Combine(cfg.SaveFolder, name));
                 UI.EditorWindow.SaveTo(path, flat);
 
                 if (!File.Exists(path)) return Fail("SaveTo returned but no file exists at " + path);
                 Say("written     : " + path + "  (" + new FileInfo(path).Length / 1024 + " KB)");
+                File.Delete(path);
+                Say("removed     : the sample, now that it has been written");
                 Say("save-test OK");
                 return 0;
             }

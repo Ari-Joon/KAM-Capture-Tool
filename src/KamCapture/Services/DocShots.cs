@@ -18,6 +18,10 @@ namespace KamCapture.Services
     /// </summary>
     public static class DocShots
     {
+        // The home window's client area: its size less the title bar and frame.
+        private const double HomeWidth = 584;
+        private const double HomeHeight = 445;
+
         public static int Run(string outputDir)
         {
             try
@@ -29,10 +33,22 @@ namespace KamCapture.Services
                 var cfg = new AppSettings
                 {
                     SaveFolder = Path.Combine(ExampleProfile, "Pictures", OutputFolder.CapturesLeaf),
-                    RecordFolder = Path.Combine(ExampleProfile, "Videos", OutputFolder.RecordingsLeaf)
+                    RecordFolder = Path.Combine(ExampleProfile, "Videos", OutputFolder.RecordingsLeaf),
+                    AudioFolder = Path.Combine(ExampleProfile, "Music", OutputFolder.AudioLeaf)
                 };
 
-                Shoot(new MainWindow(cfg), 568, 364, Path.Combine(outputDir, "home.png"));
+                // The home window on each of its three activities.
+                foreach (var (activity, file) in new[]
+                {
+                    (Activity.Screenshot, "home.png"),
+                    (Activity.Video, "home-video.png"),
+                    (Activity.Audio, "home-audio.png")
+                })
+                {
+                    var home = new MainWindow(cfg);
+                    home.PrepareActivityForDocShot(activity);
+                    Shoot(home, HomeWidth, HomeHeight, Path.Combine(outputDir, file));
+                }
 
                 // The same window with an update waiting, one version on from this one.
                 var now = Setup.Updater.Current;
@@ -41,11 +57,11 @@ namespace KamCapture.Services
                 waiting.PrepareForDocShot(new Setup.Updater.Release(next,
                     $"KAM Capture Tool {next.ToString(3)} - what changed, in a few words",
                     Setup.Updater.ReleasesPage, "https://example.invalid/KamCapture.exe", null, null, 0));
-                waiting.UpdateBar.Measure(new Size(568, double.PositiveInfinity));
-                Shoot(waiting, 568, 364 + Math.Ceiling(waiting.UpdateBar.DesiredSize.Height),
+                waiting.PrepareActivityForDocShot(Activity.Screenshot);
+                waiting.UpdateBar.Measure(new Size(HomeWidth, double.PositiveInfinity));
+                Shoot(waiting, HomeWidth, HomeHeight + Math.Ceiling(waiting.UpdateBar.DesiredSize.Height),
                     Path.Combine(outputDir, "update.png"));
                 Shoot(new SettingsWindow(cfg), 660, 700, Path.Combine(outputDir, "settings.png"));
-                Shoot(new RecorderSetupWindow(cfg), 620, 580, Path.Combine(outputDir, "record-setup.png"));
 
                 var editor = new EditorWindow(SelfTest.SampleCapture(), cfg);
                 editor.PrepareForDocShot();
@@ -87,7 +103,9 @@ namespace KamCapture.Services
                 if (child is DependencyObject d) Scrub(d);
         }
 
-        private static void Shoot(Window window, double width, double height, string path, double scale = 2.0)
+        /// <summary>Lay the window out at this client size, draw it to a PNG, and hand back what was laid out.</summary>
+        internal static FrameworkElement Shoot(Window window, double width, double height, string path,
+                                               double scale = 2.0, bool quiet = false)
         {
             window.Width = width;
             window.Height = height;
@@ -140,7 +158,8 @@ namespace KamCapture.Services
             enc.Frames.Add(BitmapFrame.Create(rtb));
             enc.Save(fs);
 
-            Console.WriteLine($"  {Path.GetFileName(path)}  {rtb.PixelWidth} x {rtb.PixelHeight}");
+            if (!quiet) Console.WriteLine($"  {Path.GetFileName(path)}  {rtb.PixelWidth} x {rtb.PixelHeight}");
+            return host;
         }
     }
 }

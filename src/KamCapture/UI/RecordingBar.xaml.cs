@@ -35,8 +35,24 @@ namespace KamCapture.UI
             public override string ToString() => Label;
         }
 
-        public RecordingBar(ScreenRecorder recorder, AppSettings cfg, bool systemAudio, string? micId)
+        private static readonly Brush MeterGreen = Frozen(0x2B, 0xB6, 0x73);
+        private static readonly Brush MeterAmber = Frozen(0xFF, 0xD4, 0x00);
+        private static readonly Brush MeterRed = Frozen(0xE5, 0x34, 0x2A);
+
+        private static Brush Frozen(byte r, byte g, byte b)
         {
+            var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
+            brush.Freeze();
+            return brush;
+        }
+
+        private int _sizeTicks;
+
+        public RecordingBar(ScreenRecorder recorder, AppSettings cfg)
+        {
+            bool systemAudio = cfg.RecordSystemAudio;
+            string? micId = cfg.RecordMicrophone ? cfg.MicrophoneDeviceId : null;
+
             InitializeComponent();
             _recorder = recorder;
             _cfg = cfg;
@@ -102,14 +118,26 @@ namespace KamCapture.UI
                 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
                 : $"{t.Minutes:00}:{t.Seconds:00}";
 
-            double peak = _recorder.AudioPeak;
-            Meter.Height = Math.Max(0, Math.Min(26, peak * 26));
-            Meter.Background = new SolidColorBrush(peak > 0.94
-                ? Color.FromRgb(0xE5, 0x34, 0x2A)
-                : peak > 0.7 ? Color.FromRgb(0xFF, 0xD4, 0x00) : Color.FromRgb(0x2B, 0xB6, 0x73));
+            double peak = Math.Clamp(_recorder.AudioPeak, 0, 1);
+            MeterScale.ScaleY = peak;
+            Meter.Background = peak > 0.94 ? MeterRed : peak > 0.7 ? MeterAmber : MeterGreen;
 
-            LblStats.Text = $"{_recorder.FramesWritten} frames" +
-                (_recorder.FramesDuplicated > 0 ? $"  ·  {_recorder.FramesDuplicated} padded" : "");
+            if (_recorder.IsAudioOnly)
+            {
+                // The file on disk, once a second: the number that matters when
+                // the point of recording sound alone was to keep it small.
+                if (_sizeTicks++ % 10 == 0)
+                {
+                    long bytes = 0;
+                    try { bytes = new System.IO.FileInfo(_recorder.OutputPath).Length; } catch { }
+                    LblStats.Text = $"{_recorder.AudioFormat.ToUpperInvariant()}  ·  {bytes / 1024.0 / 1024.0:0.0} MB";
+                }
+            }
+            else
+            {
+                LblStats.Text = $"{_recorder.FramesWritten} frames" +
+                    (_recorder.FramesDuplicated > 0 ? $"  ·  {_recorder.FramesDuplicated} padded" : "");
+            }
 
             DotRec.Fill = new SolidColorBrush(_recorder.IsPaused
                 ? Color.FromRgb(0xFF, 0xD4, 0x00)
@@ -122,7 +150,7 @@ namespace KamCapture.UI
         {
             if (!_ready) return;
             if (TglSystem.IsChecked == true)
-                _recorder.Audio.AddSystemAudio("system", null, SldSystemGain.Value);
+                _recorder.Audio.AddSystemAudio("system", _cfg.SystemAudioDeviceId, SldSystemGain.Value);
             else
                 _recorder.Audio.Remove("system");
 
