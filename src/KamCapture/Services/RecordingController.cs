@@ -184,7 +184,7 @@ namespace KamCapture.Services
             var target = recorder?.Target;
             try { recorder?.Dispose(); } catch { }
 
-            if (outcome is TakeOutcome.Discard or TakeOutcome.Retake)
+            if (outcome is TakeOutcome.Stop or TakeOutcome.Retake)
             {
                 bool binned = RecycleBin.Send(path);
                 var cfg = AppSettings.Current;
@@ -198,10 +198,13 @@ namespace KamCapture.Services
                 }
 
                 if (outcome == TakeOutcome.Retake) StateChanged?.Invoke();   // the retake could not start
-                FindMain()?.Show();
+
+                // Stop means stop: nothing kept, and back to the home window, in
+                // front, on what was being recorded.
+                FindMain()?.ShowActivity(audio ? Activity.Audio : Activity.Video);
                 Notified?.Invoke(binned
-                    ? "Take discarded. It is in the Recycle Bin if you want it back."
-                    : "Take discarded.");
+                    ? "Stopped without saving. The take is in the Recycle Bin if you want it back."
+                    : "Stopped without saving.");
                 return;
             }
 

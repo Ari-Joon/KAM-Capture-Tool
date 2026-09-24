@@ -6,7 +6,7 @@ namespace KamCapture.Services
 {
     /// <summary>
     /// Throwing a take away sends it to the Recycle Bin rather than deleting it.
-    /// Retake and Discard never ask "are you sure" — that would slow down the
+    /// Retake and Stop never ask "are you sure" — that would slow down the
     /// thing they exist to make quick — so a mistaken click has to be
     /// recoverable instead.
     /// </summary>

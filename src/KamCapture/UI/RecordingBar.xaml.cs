@@ -22,7 +22,7 @@ namespace KamCapture.UI
     /// every capture API on the machine, including this recorder.
     /// </summary>
     /// <summary>What finishing a take means.</summary>
-    public enum TakeOutcome { Save, SaveAs, Discard, Retake }
+    public enum TakeOutcome { Save, SaveAs, Stop, Retake }
 
     public partial class RecordingBar : Window
     {
@@ -222,10 +222,10 @@ namespace KamCapture.UI
         private bool _stopping, _finished;
         private TakeOutcome _outcome = TakeOutcome.Save;
 
-        private void OnStop(object sender, RoutedEventArgs e) => Finish(TakeOutcome.Save);
+        private void OnSave(object sender, RoutedEventArgs e) => Finish(TakeOutcome.Save);
         private void OnSaveAs(object sender, RoutedEventArgs e) => Finish(TakeOutcome.SaveAs);
         private void OnRetake(object sender, RoutedEventArgs e) => Finish(TakeOutcome.Retake);
-        private void OnDiscard(object sender, RoutedEventArgs e) => Finish(TakeOutcome.Discard);
+        private void OnStop(object sender, RoutedEventArgs e) => Finish(TakeOutcome.Stop);
 
         /// <summary>End the take one of the four ways. Only the first call counts.</summary>
         public void Finish(TakeOutcome outcome)
@@ -245,14 +245,14 @@ namespace KamCapture.UI
             _stopping = true;
             _ready = false;
             _tick.Stop();
-            foreach (var b in new[] { BtnPause, BtnRetake, BtnStop, BtnSaveAs, BtnDiscard })
+            foreach (var b in new[] { BtnPause, BtnRetake, BtnSave, BtnSaveAs, BtnStop })
                 b.IsEnabled = false;
             switch (_outcome)
             {
-                case TakeOutcome.Save: BtnStop.Content = "Saving…"; break;
+                case TakeOutcome.Save: BtnSave.Content = "Saving…"; break;
                 case TakeOutcome.SaveAs: BtnSaveAs.Content = "Saving…"; break;
                 case TakeOutcome.Retake: BtnRetake.Content = "Starting again…"; break;
-                case TakeOutcome.Discard: BtnDiscard.Content = "Discarding…"; break;
+                case TakeOutcome.Stop: BtnStop.Content = "Stopping…"; break;
             }
 
             // Let the button repaint as "Saving…" before ffmpeg is waited on.

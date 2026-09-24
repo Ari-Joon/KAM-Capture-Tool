@@ -328,8 +328,8 @@ namespace KamCapture.UI
             (string label, bool enabled) = _activity switch
             {
                 Activity.Screenshot => ("Take screenshot", true),
-                Activity.Video => (recording ? "Stop recording" : "Start recording", true),
-                _ => (recording ? "Stop recording" : "Start recording audio", recording || anySource)
+                Activity.Video => (recording ? "Save recording" : "Start recording", true),
+                _ => (recording ? "Save recording" : "Start recording audio", recording || anySource)
             };
             BtnPrimary.Content = label;
             BtnPrimary.IsEnabled = enabled;
@@ -340,7 +340,7 @@ namespace KamCapture.UI
 
             var format = (_cfg.AudioFormat ?? "mp3").ToUpperInvariant();
             LblNote.Text = recording
-                ? "Recording. The bar at the bottom switches sources, stops, or saves as."
+                ? "Recording. Retake, Save as… and Stop are on the bar at the bottom."
                 : anySource
                     ? $"Saved as {format}. Either source can be switched on or off while it records."
                     : "Choose system audio, the microphone, or both.";
@@ -353,7 +353,7 @@ namespace KamCapture.UI
                 : _activity switch
                 {
                     Activity.Screenshot => _cfg.HotkeyRegion + " takes a screenshot from anywhere in Windows",
-                    Activity.Video => _cfg.HotkeyRecord + " starts and stops a video from anywhere",
+                    Activity.Video => _cfg.HotkeyRecord + " starts a video from anywhere, and saves it",
                     _ => ""
                 };
             RenderStatus();

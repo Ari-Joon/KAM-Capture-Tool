@@ -215,9 +215,9 @@ namespace KamCapture.Services
         }
 
         /// <summary>
-        /// Retake and Discard, end to end, through the same controller the home
-        /// window uses: start an audio take, retake it, then discard the second
-        /// take. The folder must be left empty and both takes must be in the
+        /// Retake and Stop, end to end, through the same controller the home
+        /// window uses: start an audio take, retake it, then stop the second
+        /// take without saving. The folder must be left empty and both takes must be in the
         /// Recycle Bin. Shows the recording bar for a few seconds. The two takes
         /// are then removed from the Recycle Bin, so nothing is left behind.
         /// </summary>
@@ -249,15 +249,15 @@ namespace KamCapture.Services
                 Say("  retake: take 1 thrown away, take 2 recording");
                 Pump(1500);
 
-                RecordingController.FinishActive(UI.TakeOutcome.Discard);
+                RecordingController.FinishActive(UI.TakeOutcome.Stop);
                 if (!PumpUntil(() => !RecordingController.IsRecording, 10000))
-                    return Fail("Discard did not stop the recording");
+                    return Fail("Stop did not end the recording");
                 Pump(300);
 
                 var left = Directory.GetFiles(folder, prefix + "*");
                 if (left.Length > 0)
                     return Fail("takes left in the folder: " + string.Join(", ", left.Select(Path.GetFileName)));
-                Say("  discard: nothing left in the folder");
+                Say("  stop: nothing left in the folder");
 
                 int binned = RemoveFromRecycleBin(folder, prefix);
                 if (binned != 2) return Fail($"expected both takes in the Recycle Bin, found {binned}");

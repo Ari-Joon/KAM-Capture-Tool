@@ -42,7 +42,7 @@ signed. *More info* then *Run anyway*.
 | `--rectest=<file>,<seconds>[,<pause>]` | Record a small region headlessly and check the frame count; with a pause, check the paused stretch is left out |
 | `--audiotest=<file>,<seconds>[,<pause>]` | Record sound only to `.mp3`, `.m4a` or `.wav`, switching system audio off and on mid-take, and check the length |
 | `--docshots=<dir>` | Render the windows to PNGs offscreen, for documentation |
-| `--retaketest[=<dir>]` | Retake then Discard an audio take through the real controller, and check both takes went to the Recycle Bin; shows the recording bar briefly, and removes its takes from the bin afterwards |
+| `--retaketest[=<dir>]` | Retake then Stop an audio take through the real controller, and check both takes went to the Recycle Bin; shows the recording bar briefly, and removes its takes from the bin afterwards |
 | `--layoutcheck[=<dir>]` | Lay out every window offscreen, in the states that stretch it, and fail if anything is cut off; writes a PNG of each state |
 
 The checks run alongside a copy that is already in the tray. Setup commands
@@ -75,7 +75,7 @@ Three things across the top, and what each one needs underneath it.
 **Full screen** is the display under the pointer, taken without a click.
 Screenshot and Video each remember their own choice, so a habit of recording the
 full screen does not change what a screenshot does. The sound choices are shared
-by Video and Audio. While a recording runs, the button becomes **Stop recording**.
+by Video and Audio. While a recording runs, the button becomes **Save recording**.
 
 Underneath the button is one line: what just happened — *Audio saved as
 KAM-2026-09-24-10-15-22.mp3, 86.4 MB* — and otherwise the shortcut for what is
@@ -85,7 +85,7 @@ where it points.
 
 The tray menu has the same things in the same words — *Screenshot a region*,
 *Screenshot a window*, *Screenshot the full screen*, *Record video*, *Record
-audio* — and the recording item reads *Stop recording* while one is running.
+audio* — and the recording item reads *Save the … recording* while one is running.
 
 ## Updates
 
@@ -166,7 +166,7 @@ silently failing.
 | `Ctrl+Shift+S` | Capture a region |
 | `Ctrl+Shift+W` | Capture a window |
 | `Ctrl+Shift+F` | Capture everything |
-| `Ctrl+Shift+R` | Record video, or stop whatever is recording |
+| `Ctrl+Shift+R` | Record video, or save whatever is recording |
 
 ## While selecting
 
@@ -274,17 +274,19 @@ stays continuous and in sync.
 
 **Pause** leaves the paused stretch out of the file, picture and sound alike.
 
-**Stop** saves under the automatic name. **Save as…** beside it stops, then asks
-for a name and a folder, and moves the finished file there. Cancel that dialog
-and the recording is kept under its automatic name — closing a dialog never
-throws a recording away.
+The bar reads **Pause · Retake · Save · Save as… · Stop**.
 
-**Retake** throws the take away and starts again straight away — same sources,
-same region or window, the bar where you left it, and *take 2* beside the time
-so you know it happened. **Discard** stops and throws the take away. Neither asks
-"are you sure", because that would slow down the thing they exist to make quick;
-instead a discarded take goes to the Recycle Bin, not away for good, so a
-mistaken click costs nothing.
+| | |
+|---|---|
+| **Save** | Finish and save under the automatic name |
+| **Save as…** | Finish, then choose the name and folder; the finished file is moved there. Cancel that dialog and it is kept under its automatic name |
+| **Retake** | Throw this take away and start again straight away — same sources, same region or window, the bar where you left it, and *take 2* beside the time |
+| **Stop** | End everything without saving, and bring the home window back to the front |
+
+Retake and Stop never ask "are you sure", because that would slow down the thing
+they exist to make quick; instead the take they throw away goes to the Recycle
+Bin, not away for good, so a mistaken click costs nothing. The home window's
+**Save recording**, the tray and `Ctrl+Shift+R` all save, like **Save**.
 
 The control bar never appears in the recording. Neither does the selection
 overlay while a recording is in progress.
@@ -335,7 +337,7 @@ that folder with the next number already filled in, so the rest are Enter.
 ## Save as
 
 Screenshots, videos and audio all have it: on the selection bar and in the
-annotator for a screenshot (`F12` in both), and beside **Stop** on the recording
+annotator for a screenshot (`F12` in both), and beside **Save** on the recording
 bar. Each kind remembers where its last Save as went, and opens there next time.
 
 If the last name ended in a number, the suggestion is the next one —

@@ -127,7 +127,7 @@ namespace KamCapture
                 return;
             }
 
-            // Retake and Discard through the real controller; shows the recording bar briefly.
+            // Retake and Stop through the real controller; shows the recording bar briefly.
             var retakeTest = e.Args.FirstOrDefault(a => a.StartsWith("--retaketest", StringComparison.OrdinalIgnoreCase));
             if (retakeTest != null)
             {
@@ -576,12 +576,12 @@ namespace KamCapture
                 bool audio = RecordingController.IsRecordingAudioOnly;
                 if (_trayVideo != null)
                 {
-                    _trayVideo.Text = recording && !audio ? "Stop recording video" : "Record video";
+                    _trayVideo.Text = recording && !audio ? "Save the video recording" : "Record video";
                     _trayVideo.Enabled = !recording || !audio;
                 }
                 if (_trayAudio != null)
                 {
-                    _trayAudio.Text = recording && audio ? "Stop recording audio" : "Record audio";
+                    _trayAudio.Text = recording && audio ? "Save the audio recording" : "Record audio";
                     _trayAudio.Enabled = !recording || audio;
                 }
             }));

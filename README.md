@@ -264,7 +264,7 @@ A folder of `KAM-2026-09-24-10-15-22.png` files is a folder you will be renaming
 later, one at a time, having opened each to remember what it was.
 
 So screenshots, videos and audio all have **Save as…** — on the selection bar and
-in the annotator (`F12`), and beside **Stop** on the recording bar. Each kind
+in the annotator (`F12`), and beside **Save** on the recording bar. Each kind
 opens where its last Save as went, and when the last name ended in a number the
 next one is already filled in: after *Lecture 5 slide 3* comes *Lecture 5 slide
 4*, padding kept, stepping past any name already taken. Naming a deck of slides
@@ -281,11 +281,17 @@ A bad take that gets saved is a file you find and delete later, usually after
 listening to enough of it to be sure. Recording a lecture's worth of audio, that
 adds up.
 
-The recording bar has **Retake**, which throws the take away and starts again
-straight away — same sources, same region or window, the bar where you left it,
-*take 2* beside the time — and **Discard**, which stops and throws it away. The
-annotator has **Retake** (`Ctrl+R`) for a screenshot: the capture is thrown away
-and taken again the same way.
+The recording bar reads **Pause · Retake · Save · Save as… · Stop**. Two ways to
+keep a take, and two not to:
+
+- **Retake** throws the take away and starts again straight away — same sources,
+  same region or window, the bar where you left it, *take 2* beside the time.
+- **Stop** ends everything without saving, and brings the home window back to
+  the front.
+
+**Save** is what used to be labelled Stop; it was renamed so that Stop could mean
+stop. The annotator has **Retake** (`Ctrl+R`) for a screenshot: the capture is
+thrown away and taken again the same way.
 
 Neither asks "are you sure". A confirmation on every retake would slow down the
 one thing retakes are for, so the safety is somewhere else: a thrown-away take
@@ -294,10 +300,10 @@ annotator, and only when something has been drawn on the capture, because that i
 work rather than a file.
 
 `--retaketest` drives the real controller: start an audio take, retake it,
-discard the second, then check the folder is empty and both takes are in the
+stop the second, then check the folder is empty and both takes are in the
 Recycle Bin — and take them back out, so the test leaves nothing behind. Run
-once with Discard deleting outright, it failed: *expected both takes in the
-Recycle Bin, found 0*.
+once with the throw-away deleting outright, it failed: *expected both takes in
+the Recycle Bin, found 0*.
 
 ## Nothing cut off
 
@@ -455,7 +461,7 @@ and nothing about you or your captures, and it can be switched off in Settings.
 | `Ctrl+Shift+S` | Capture a region |
 | `Ctrl+Shift+W` | Capture a window |
 | `Ctrl+Shift+F` | Capture everything |
-| `Ctrl+Shift+R` | Record video, or stop whatever is recording |
+| `Ctrl+Shift+R` | Record video, or save whatever is recording |
 
 Inside the annotator: `V` select · `P` pencil · `K` highlighter · `L` line ·
 `A` arrow · `R` rectangle · `O` ellipse · `T` text · `S` numbered marker ·
@@ -467,7 +473,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.6.0. Everything described above is implemented and works.
+Version 1.6.1. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
@@ -483,7 +489,7 @@ Version 1.6.0. Everything described above is implemented and works.
 | Pause that leaves the paused stretch out of the file | Done |
 | A folder and an Open button for each kind of output | Done |
 | Save as for screenshots, videos and audio, with the next name filled in | Done |
-| Retake and Discard, into the Recycle Bin rather than away for good | Done |
+| Retake, and a Stop that saves nothing, into the Recycle Bin rather than away for good | Done |
 | Layout check: nothing cut off, in any window, in CI | Done |
 | Self-install, shortcuts, uninstall entry | Done |
 | Updates from GitHub, with a prompt | Done |
