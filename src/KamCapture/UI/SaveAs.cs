@@ -117,6 +117,39 @@ namespace KamCapture.UI
             return chosen;
         }
 
+        /// <summary>
+        /// A screenshot saved by Save as has just been thrown away. If it was the
+        /// last one, step the memory back one, so the next Save as offers its
+        /// name again: retaking "slide 4" should be saved as "slide 4".
+        /// </summary>
+        public static void Forget(AppSettings cfg, string discarded)
+        {
+            if (!string.Equals(cfg.LastScreenshotSaveAs, discarded, StringComparison.OrdinalIgnoreCase)) return;
+
+            // No number to step back: the folder is still right, and the name
+            // suggested next was never going to count on it.
+            var previous = PreviousInSequence(Path.GetFileNameWithoutExtension(discarded), cfg.FileNameTemplate);
+            if (previous == null) return;
+
+            cfg.LastScreenshotSaveAs = Path.Combine(Path.GetDirectoryName(discarded) ?? "",
+                                                    previous + Path.GetExtension(discarded));
+            cfg.Save();
+        }
+
+        /// <summary>"slide 4" → "slide 3", "slide 10" → "slide 09" when it was padded. Null below 1.</summary>
+        internal static string? PreviousInSequence(string? name, string template)
+        {
+            if (string.IsNullOrWhiteSpace(name) || IsAutomatic(name, template)) return null;
+
+            var m = Regex.Match(name, @"^(.*?)(\d+)$");
+            if (!m.Success || m.Groups[2].Value.Length > 18) return null;
+
+            var digits = m.Groups[2].Value;
+            var n = long.Parse(digits) - 1;
+            if (n < 0) return null;
+            return m.Groups[1].Value + n.ToString().PadLeft(digits.Length, '0');
+        }
+
         /// <summary>The name to offer: the next in the last sequence, or a fresh automatic one.</summary>
         internal static string SuggestName(string? lastName, AppSettings cfg, string folder, string ext,
                                            string? fallback = null)

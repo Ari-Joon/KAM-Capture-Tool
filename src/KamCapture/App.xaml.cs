@@ -127,6 +127,18 @@ namespace KamCapture
                 return;
             }
 
+            // Retake and Discard through the real controller; shows the recording bar briefly.
+            var retakeTest = e.Args.FirstOrDefault(a => a.StartsWith("--retaketest", StringComparison.OrdinalIgnoreCase));
+            if (retakeTest != null)
+            {
+                var dir = retakeTest.Contains('=')
+                    ? retakeTest[(retakeTest.IndexOf('=') + 1)..]
+                    : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "KAM Capture Tool", "retake-test");
+                Environment.ExitCode = SelfTest.RetakeTest(dir);
+                Shutdown();
+                return;
+            }
+
             var docShots = e.Args.FirstOrDefault(a => a.StartsWith("--docshots", StringComparison.OrdinalIgnoreCase));
             if (docShots != null)
             {

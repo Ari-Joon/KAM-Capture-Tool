@@ -21,6 +21,9 @@ namespace KamCapture.UI
     /// The bar sets WDA_EXCLUDEFROMCAPTURE on itself, so it is invisible to
     /// every capture API on the machine, including this recorder.
     /// </summary>
+    /// <summary>What finishing a take means.</summary>
+    public enum TakeOutcome { Save, SaveAs, Discard, Retake }
+
     public partial class RecordingBar : Window
     {
         private readonly ScreenRecorder _recorder;
@@ -28,8 +31,13 @@ namespace KamCapture.UI
         private readonly DispatcherTimer _tick;
         private bool _ready;
 
-        /// <summary>The finished file, and whether Save as was asked for.</summary>
-        public event Action<string?, bool>? Stopped;
+        /// <summary>The finished file, and what to do with it.</summary>
+        public event Action<string?, TakeOutcome>? Stopped;
+
+        /// <summary>Where the bar was on screen when it closed, in pixels, so a retake's bar opens there.</summary>
+        public (int X, int Y)? ClosedAt { get; private set; }
+
+        private readonly (int X, int Y)? _placeAt;
 
         private sealed record MicItem(string Label, string? Id)
         {
@@ -49,8 +57,9 @@ namespace KamCapture.UI
 
         private int _sizeTicks;
 
-        public RecordingBar(ScreenRecorder recorder, AppSettings cfg)
+        public RecordingBar(ScreenRecorder recorder, AppSettings cfg, int take = 1, (int X, int Y)? placeAt = null)
         {
+            _placeAt = placeAt;
             bool systemAudio = cfg.RecordSystemAudio;
             string? micId = cfg.RecordMicrophone ? cfg.MicrophoneDeviceId : null;
 
@@ -60,7 +69,7 @@ namespace KamCapture.UI
 
             WindowStyling.ExcludeFromCapture(this);
 
-            LblTarget.Text = recorder.Target.Description;
+            LblTarget.Text = recorder.Target.Description + (take > 1 ? $"  ·  take {take}" : "");
             TglSystem.IsChecked = systemAudio;
             SldSystemGain.Value = cfg.SystemAudioGain;
             SldMicGain.Value = cfg.MicrophoneGain;
@@ -97,6 +106,9 @@ namespace KamCapture.UI
             var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
             int x = mon.WorkX + (int)((mon.WorkWidth - w) / 2);
             int y = mon.WorkY + mon.WorkHeight - (int)(ActualHeight * scale) - (int)(24 * scale);
+
+            // A retake opens where the last bar was left, not back in the middle.
+            if (_placeAt is { } at) (x, y) = (at.X, at.Y);
 
             NativeMethods.SetWindowPos(hwnd, NativeMethods.HWND_TOPMOST, x, y, 0, 0,
                 NativeMethods.SWP_NOACTIVATE | 0x0001 /* SWP_NOSIZE */);
@@ -207,14 +219,19 @@ namespace KamCapture.UI
             else { _recorder.Pause(); BtnPause.Content = "Resume"; }
         }
 
-        private bool _stopping, _finished, _saveAs;
+        private bool _stopping, _finished;
+        private TakeOutcome _outcome = TakeOutcome.Save;
 
-        private void OnStop(object sender, RoutedEventArgs e) => RequestStop();
+        private void OnStop(object sender, RoutedEventArgs e) => Finish(TakeOutcome.Save);
+        private void OnSaveAs(object sender, RoutedEventArgs e) => Finish(TakeOutcome.SaveAs);
+        private void OnRetake(object sender, RoutedEventArgs e) => Finish(TakeOutcome.Retake);
+        private void OnDiscard(object sender, RoutedEventArgs e) => Finish(TakeOutcome.Discard);
 
-        private void OnSaveAs(object sender, RoutedEventArgs e)
+        /// <summary>End the take one of the four ways. Only the first call counts.</summary>
+        public void Finish(TakeOutcome outcome)
         {
             if (_stopping) return;
-            _saveAs = true;
+            _outcome = outcome;
             RequestStop();
         }
 
@@ -228,11 +245,15 @@ namespace KamCapture.UI
             _stopping = true;
             _ready = false;
             _tick.Stop();
-            BtnStop.IsEnabled = false;
-            BtnSaveAs.IsEnabled = false;
-            if (_saveAs) BtnSaveAs.Content = "Saving…";
-            else BtnStop.Content = "Saving…";
-            BtnPause.IsEnabled = false;
+            foreach (var b in new[] { BtnPause, BtnRetake, BtnStop, BtnSaveAs, BtnDiscard })
+                b.IsEnabled = false;
+            switch (_outcome)
+            {
+                case TakeOutcome.Save: BtnStop.Content = "Saving…"; break;
+                case TakeOutcome.SaveAs: BtnSaveAs.Content = "Saving…"; break;
+                case TakeOutcome.Retake: BtnRetake.Content = "Starting again…"; break;
+                case TakeOutcome.Discard: BtnDiscard.Content = "Discarding…"; break;
+            }
 
             // Let the button repaint as "Saving…" before ffmpeg is waited on.
             Dispatcher.BeginInvoke(new Action(FinishStop), DispatcherPriority.Background);
@@ -261,8 +282,11 @@ namespace KamCapture.UI
 
             // Gone before anything is asked: the bar stays on top of everything,
             // and would sit over the Save as dialog.
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (hwnd != IntPtr.Zero && NativeMethods.GetWindowRect(hwnd, out var r)) ClosedAt = (r.Left, r.Top);
+
             Close();
-            Stopped?.Invoke(path, _saveAs);
+            Stopped?.Invoke(path, _outcome);
         }
 
         private void OnDragBar(object sender, MouseButtonEventArgs e)

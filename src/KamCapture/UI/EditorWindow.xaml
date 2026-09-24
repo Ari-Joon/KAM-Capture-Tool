@@ -65,6 +65,9 @@
                     <Button x:Name="BtnNewCapture" Style="{StaticResource BarButton}"
                             Content="New capture" ToolTip="Take another capture — this one stays open  (Ctrl+N)"
                             Click="OnNewCapture"/>
+                    <Button x:Name="BtnRetake" Style="{StaticResource BarButton}" Content="Retake"
+                            ToolTip="Throw this capture away and take it again, the same way  (Ctrl+R). Anything already saved from it goes to the Recycle Bin."
+                            Click="OnRetake"/>
 
                     <Border Style="{StaticResource Divider}"/>
 

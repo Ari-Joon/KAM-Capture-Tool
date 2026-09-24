@@ -214,6 +214,107 @@ namespace KamCapture.Services
             }
         }
 
+        /// <summary>
+        /// Retake and Discard, end to end, through the same controller the home
+        /// window uses: start an audio take, retake it, then discard the second
+        /// take. The folder must be left empty and both takes must be in the
+        /// Recycle Bin. Shows the recording bar for a few seconds. The two takes
+        /// are then removed from the Recycle Bin, so nothing is left behind.
+        /// </summary>
+        public static int RetakeTest(string folder)
+        {
+            const string prefix = "kam-retake-test";
+            var cfg = Settings.AppSettings.Load();
+            var keep = (cfg.AudioFolder, cfg.AudioFormat, cfg.FileNameTemplate, cfg.RecordSystemAudio, cfg.RecordMicrophone);
+            try
+            {
+                folder = Path.GetFullPath(folder);
+                Directory.CreateDirectory(folder);
+                foreach (var old in Directory.GetFiles(folder, prefix + "*")) File.Delete(old);
+
+                cfg.AudioFolder = folder;
+                cfg.AudioFormat = "mp3";
+                cfg.FileNameTemplate = prefix;
+                cfg.RecordSystemAudio = true;
+                cfg.RecordMicrophone = false;
+
+                _ = RecordingController.StartAudioAsync(cfg);
+                Pump(1500);
+                if (!RecordingController.IsRecording) return Fail("the first take did not start");
+                Say("  take 1 recording");
+
+                RecordingController.FinishActive(UI.TakeOutcome.Retake);
+                if (!PumpUntil(() => RecordingController.IsRecording && RecordingController.Take == 2, 10000))
+                    return Fail("Retake did not start a second take");
+                Say("  retake: take 1 thrown away, take 2 recording");
+                Pump(1500);
+
+                RecordingController.FinishActive(UI.TakeOutcome.Discard);
+                if (!PumpUntil(() => !RecordingController.IsRecording, 10000))
+                    return Fail("Discard did not stop the recording");
+                Pump(300);
+
+                var left = Directory.GetFiles(folder, prefix + "*");
+                if (left.Length > 0)
+                    return Fail("takes left in the folder: " + string.Join(", ", left.Select(Path.GetFileName)));
+                Say("  discard: nothing left in the folder");
+
+                int binned = RemoveFromRecycleBin(folder, prefix);
+                if (binned != 2) return Fail($"expected both takes in the Recycle Bin, found {binned}");
+                Say("  both takes were in the Recycle Bin, and are now removed from it");
+
+                Say("retake-test OK");
+                return 0;
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+            finally
+            {
+                (cfg.AudioFolder, cfg.AudioFormat, cfg.FileNameTemplate, cfg.RecordSystemAudio, cfg.RecordMicrophone) = keep;
+            }
+        }
+
+        private static bool PumpUntil(Func<bool> done, int timeoutMs)
+        {
+            var until = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+            while (DateTime.UtcNow < until)
+            {
+                if (done()) return true;
+                Pump(50);
+            }
+            return done();
+        }
+
+        /// <summary>
+        /// Find this test's files in the Recycle Bin by the folder they were
+        /// deleted from, and remove them from it for good: the bin keeps each
+        /// as a $R file with a $I file describing it, and both go. Returns how
+        /// many were found.
+        /// </summary>
+        private static int RemoveFromRecycleBin(string folder, string prefix)
+        {
+            var shellType = Type.GetTypeFromProgID("Shell.Application") ?? throw new InvalidOperationException("no Shell.Application");
+            dynamic shell = Activator.CreateInstance(shellType)!;
+            dynamic bin = shell.NameSpace(10);   // the Recycle Bin
+
+            var found = new System.Collections.Generic.List<string>();
+            foreach (dynamic item in bin.Items())
+            {
+                string from = (item.ExtendedProperty("System.Recycle.DeletedFrom") as string) ?? "";
+                string name = item.Name;
+                if (string.Equals(from.TrimEnd('\\'), folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) &&
+                    name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    found.Add((string)item.Path);
+            }
+
+            foreach (var stored in found)
+            {
+                var info = Path.Combine(Path.GetDirectoryName(stored)!, "$I" + Path.GetFileName(stored)[2..]);
+                File.Delete(stored);
+                if (File.Exists(info)) File.Delete(info);
+            }
+            return found.Count;
+        }
+
         /// <summary>Wait out a recording, pausing for a stretch in the middle of it.</summary>
         private static void RunWithPause(double seconds, int pauseSeconds, Action pause, Action resume)
         {
@@ -873,6 +974,17 @@ namespace KamCapture.Services
                 var got = UI.SaveAs.NextInSequence(last, template);
                 if (got != expected) return $"after \"{last}\" expected \"{expected}\", got \"{got}\"";
             }
+
+            // A retaken screenshot steps the memory back, so its name is offered again.
+            foreach (var name in new[] { "slide 4", "slide 10", "Part 2 - 008", "slide 1" })
+            {
+                var back = UI.SaveAs.PreviousInSequence(name, template);
+                var again = UI.SaveAs.NextInSequence(back, template);
+                if (again != name) return $"stepping back from \"{name}\" then on again gave \"{again}\"";
+            }
+            if (UI.SaveAs.PreviousInSequence("slide 0", template) != null) return "stepped back below zero";
+            if (UI.SaveAs.PreviousInSequence("KAM-2026-09-24-10-15-22", template) != null)
+                return "stepped back through an automatic name";
 
             if (!UI.SaveAs.IsAutomatic("2026-09-24-10-15-22", "{datetime}"))
                 return "a {datetime} name was not recognised as automatic";

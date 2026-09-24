@@ -24,6 +24,9 @@ namespace KamCapture.Services
         private static ScreenRecorder? _active;
         private static RecordingBar? _bar;
 
+        // Which take this is, counting retakes of the same recording.
+        private static int _take = 1;
+
         public static bool IsRecording => _active != null;
         public static bool IsRecordingAudioOnly => _active?.IsAudioOnly == true;
 
@@ -97,8 +100,10 @@ namespace KamCapture.Services
             await BeginAsync(cfg, target, ffmpeg, hideMain: true);
         }
 
-        private static async Task BeginAsync(AppSettings cfg, RecordTarget target, string ffmpeg, bool hideMain)
+        private static async Task BeginAsync(AppSettings cfg, RecordTarget target, string ffmpeg, bool hideMain,
+                                             int take = 1, (int X, int Y)? barAt = null)
         {
+            _take = take;
             var main = FindMain();
             if (hideMain)
             {
@@ -122,7 +127,7 @@ namespace KamCapture.Services
 
                 if (recorder.FormatNote != null) Notified?.Invoke(recorder.FormatNote);
 
-                _bar = new RecordingBar(recorder, cfg);
+                _bar = new RecordingBar(recorder, cfg, take, barAt);
                 _bar.Stopped += OnBarStopped;
                 _bar.Show();
 
@@ -131,7 +136,8 @@ namespace KamCapture.Services
             catch (Exception ex)
             {
                 _active = null;
-                if (hideMain) main?.Show();
+                main?.Show();
+                StateChanged?.Invoke();
                 Log.Error("Recording could not start", ex);
                 MessageBox.Show("Recording could not start.\n\n" + ex.Message, "KAM Capture Tool",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -162,16 +168,42 @@ namespace KamCapture.Services
             return RecordTarget.WindowTarget(window);
         }
 
-        private static void OnBarStopped(string? path, bool saveAs)
+        private static void OnBarStopped(string? path, TakeOutcome outcome)
         {
+            var barAt = _bar?.ClosedAt;
             var recorder = _active;
             _active = null;
             _bar = null;
             CaptureOverlay.HideFromCapture = false;
-            StateChanged?.Invoke();
+
+            // A retake goes straight into the next take, so the home window
+            // and the tray are not told it stopped in between.
+            if (outcome != TakeOutcome.Retake) StateChanged?.Invoke();
 
             bool audio = recorder?.IsAudioOnly == true;
+            var target = recorder?.Target;
             try { recorder?.Dispose(); } catch { }
+
+            if (outcome is TakeOutcome.Discard or TakeOutcome.Retake)
+            {
+                bool binned = RecycleBin.Send(path);
+                var cfg = AppSettings.Current;
+
+                // Straight into the next take: same target, same sources, the
+                // bar where it was left. The home window stays as it is.
+                if (outcome == TakeOutcome.Retake && target != null && RequireFfmpeg(cfg) is { } ffmpeg)
+                {
+                    _ = BeginAsync(cfg, target, ffmpeg, hideMain: false, take: _take + 1, barAt: barAt);
+                    return;
+                }
+
+                if (outcome == TakeOutcome.Retake) StateChanged?.Invoke();   // the retake could not start
+                FindMain()?.Show();
+                Notified?.Invoke(binned
+                    ? "Take discarded. It is in the Recycle Bin if you want it back."
+                    : "Take discarded.");
+                return;
+            }
 
             var main = FindMain();
             main?.Show();
@@ -179,7 +211,7 @@ namespace KamCapture.Services
             if (path != null && File.Exists(path))
             {
                 var cfg = AppSettings.Current;
-                if (saveAs) path = SaveAs.AskForRecording(cfg, path, audio, main);
+                if (outcome == TakeOutcome.SaveAs) path = SaveAs.AskForRecording(cfg, path, audio, main);
 
                 var size = new FileInfo(path).Length;
                 // The name, not the path: the folder is one button away. Named
@@ -192,6 +224,12 @@ namespace KamCapture.Services
 
         /// <summary>Stop the running recording and save it, as the Stop button does.</summary>
         public static void StopActive() => _bar?.RequestStop();
+
+        /// <summary>End the running take one of the bar's four ways, as its buttons do.</summary>
+        internal static void FinishActive(TakeOutcome outcome) => _bar?.Finish(outcome);
+
+        /// <summary>Which take is running; 1 until a retake.</summary>
+        internal static int Take => _take;
 
         /// <summary>Stop and finish writing the file before returning. For exit.</summary>
         public static void StopActiveNow() => _bar?.StopNow();

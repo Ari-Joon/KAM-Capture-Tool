@@ -82,6 +82,7 @@ The rest run on your machine rather than in CI:
 | `--lifecycletest` | After a capture, the home window and any open annotator come back where they should |
 | `--foldertest` | A OneDrive folder Windows chose is moved back to local disk; one you confirmed is left alone |
 | `--updatetest` | Versions compare number by number, GitHub's reply is read correctly, a download that fails its checksum is refused and removed, a failed program swap puts the old one back, and a download opened over a running copy is offered as an update. No network |
+| `--retaketest` | Retake and Discard through the real controller: a retake starts take 2, a discard stops, the folder is left empty, and both takes are in the Recycle Bin — which the test then clears of them. Shows the recording bar for a few seconds |
 | `--installtest` | "Start with Windows" starts the installed copy, not the download, and an unattended update keeps the folder, shortcuts and startup choice. Runs against a scratch registry key and folders, then checks the real install was left alone |
 
 Each was run once against the bug it guards, to watch it fail, before it was

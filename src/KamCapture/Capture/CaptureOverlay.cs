@@ -23,6 +23,9 @@ namespace KamCapture.Capture
         public BitmapSource? Image { get; set; }
         public Int32Rect Region { get; set; }
         public IntPtr SourceWindow { get; set; }
+
+        /// <summary>The mode the capture was finally taken in, so a retake can use it again.</summary>
+        public SnipMode Mode { get; set; } = SnipMode.Region;
     }
 
     /// <summary>
@@ -149,6 +152,7 @@ namespace KamCapture.Capture
 
         public void Commit(CaptureAction action)
         {
+            Result.Mode = Mode;
 
             if (action == CaptureAction.Cancel)
             {

@@ -275,6 +275,30 @@ A recording is written under its automatic name while it runs, and Save as moves
 the finished file. Cancel the dialog and it stays where it is: closing a dialog
 never throws a recording away.
 
+## Retakes
+
+A bad take that gets saved is a file you find and delete later, usually after
+listening to enough of it to be sure. Recording a lecture's worth of audio, that
+adds up.
+
+The recording bar has **Retake**, which throws the take away and starts again
+straight away — same sources, same region or window, the bar where you left it,
+*take 2* beside the time — and **Discard**, which stops and throws it away. The
+annotator has **Retake** (`Ctrl+R`) for a screenshot: the capture is thrown away
+and taken again the same way.
+
+Neither asks "are you sure". A confirmation on every retake would slow down the
+one thing retakes are for, so the safety is somewhere else: a thrown-away take
+goes to the **Recycle Bin**, not away for good. The only question asked is in the
+annotator, and only when something has been drawn on the capture, because that is
+work rather than a file.
+
+`--retaketest` drives the real controller: start an audio take, retake it,
+discard the second, then check the folder is empty and both takes are in the
+Recycle Bin — and take them back out, so the test leaves nothing behind. Run
+once with Discard deleting outright, it failed: *expected both takes in the
+Recycle Bin, found 0*.
+
 ## Nothing cut off
 
 A window with a fixed size and text that changes will eventually be asked to
@@ -443,7 +467,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.5.0. Everything described above is implemented and works.
+Version 1.6.0. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
@@ -459,6 +483,7 @@ Version 1.5.0. Everything described above is implemented and works.
 | Pause that leaves the paused stretch out of the file | Done |
 | A folder and an Open button for each kind of output | Done |
 | Save as for screenshots, videos and audio, with the next name filled in | Done |
+| Retake and Discard, into the Recycle Bin rather than away for good | Done |
 | Layout check: nothing cut off, in any window, in CI | Done |
 | Self-install, shortcuts, uninstall entry | Done |
 | Updates from GitHub, with a prompt | Done |
@@ -478,6 +503,9 @@ The honest gaps:
   file was right. Audio-only shares that mixer and is measured by
   `--audiotest`, which switches system audio off and on and pauses in the middle
   of a take, but an hour-long call is a different test from eight seconds.
+- **The annotator's Retake has no automated test.** It opens the selection
+  overlay across the screen, which the headless checks deliberately avoid. The
+  recording side is covered end to end by `--retaketest`.
 - **The layout check does not cover the capture overlay or the recording bar.**
   The overlay is drawn in code rather than laid out, and the bar sizes itself to
   whatever it holds, so neither has an edge to be cut off by in the same sense.

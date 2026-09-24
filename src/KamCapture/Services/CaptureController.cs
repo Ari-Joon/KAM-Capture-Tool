@@ -149,7 +149,7 @@ namespace KamCapture.Services
                 // the next capture without restarting.
                 if (home != null) _parkedHome = home;
 
-                var editor = new EditorWindow(image, cfg);
+                var editor = new EditorWindow(image, cfg, result.Mode, saved ? savedPath : null);
                 editor.Closed += OnEditorClosed;
                 editor.Show();
                 editor.Activate();
@@ -174,10 +174,33 @@ namespace KamCapture.Services
         }
 
         private static MainWindow? _parkedHome;
+        private static bool _retaking;
+
+        /// <summary>
+        /// Close an annotator and take its capture again, the same way. The home
+        /// window is not brought back in between, as closing the last annotator
+        /// normally does; if the new capture is cancelled, it comes back then.
+        /// </summary>
+        public static async Task RetakeAsync(SnipMode mode, AppSettings cfg, EditorWindow old)
+        {
+            _retaking = true;
+            try { old.Close(); }
+            finally { _retaking = false; }
+
+            await RunAsync(mode, cfg);
+
+            bool annotatorOpen = Application.Current.Windows.OfType<EditorWindow>().Any(w => w.IsVisible);
+            if (!annotatorOpen && _parkedHome is { } home)
+            {
+                _parkedHome = null;
+                home.Show();
+                home.Activate();
+            }
+        }
 
         private static void OnEditorClosed(object? sender, EventArgs e)
         {
-            if (_parkedHome == null) return;
+            if (_parkedHome == null || _retaking) return;
 
             bool anotherOpen = Application.Current.Windows.OfType<EditorWindow>()
                 .Any(w => w.IsVisible && !ReferenceEquals(w, sender));

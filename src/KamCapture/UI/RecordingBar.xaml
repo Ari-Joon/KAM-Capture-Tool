@@ -26,10 +26,14 @@
 
             <Button x:Name="BtnPause" Content="Pause" MinWidth="70" Click="OnPause"
                     ToolTip="Pause. The paused stretch is left out of the file."/>
+            <Button x:Name="BtnRetake" Content="Retake" Margin="6,0,0,0" Click="OnRetake"
+                    ToolTip="Throw this take away and start again, straight away. It goes to the Recycle Bin."/>
             <Button x:Name="BtnStop" Style="{StaticResource PrimaryButton}" Content="Stop"
                     Margin="6,0,0,0" MinWidth="70" Click="OnStop" ToolTip="Finish and save under the automatic name"/>
             <Button x:Name="BtnSaveAs" Content="Save as…" Margin="6,0,0,0" Click="OnSaveAs"
                     ToolTip="Finish, then choose the name and the folder"/>
+            <Button x:Name="BtnDiscard" Content="Discard" Margin="6,0,0,0" Click="OnDiscard"
+                    ToolTip="Stop and throw this take away. It goes to the Recycle Bin."/>
 
             <Border Width="1" Background="{StaticResource Edge}" Margin="12,3"/>
 

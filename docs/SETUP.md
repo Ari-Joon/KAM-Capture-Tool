@@ -42,6 +42,7 @@ signed. *More info* then *Run anyway*.
 | `--rectest=<file>,<seconds>[,<pause>]` | Record a small region headlessly and check the frame count; with a pause, check the paused stretch is left out |
 | `--audiotest=<file>,<seconds>[,<pause>]` | Record sound only to `.mp3`, `.m4a` or `.wav`, switching system audio off and on mid-take, and check the length |
 | `--docshots=<dir>` | Render the windows to PNGs offscreen, for documentation |
+| `--retaketest[=<dir>]` | Retake then Discard an audio take through the real controller, and check both takes went to the Recycle Bin; shows the recording bar briefly, and removes its takes from the bin afterwards |
 | `--layoutcheck[=<dir>]` | Lay out every window offscreen, in the states that stretch it, and fail if anything is cut off; writes a PNG of each state |
 
 The checks run alongside a copy that is already in the tray. Setup commands
@@ -242,6 +243,7 @@ the board, so neither can be lost off the edge.
 | `F12` or **Save as…** | Choose the name, the folder and the format — PNG, JPEG or BMP |
 | `Ctrl+Shift+C` | Copy the whole board to the clipboard |
 | `Ctrl+N` or **New capture** | Take another capture — this annotator stays open, work and all |
+| `Ctrl+R` or **Retake** | Throw this capture away and take it again the same way — region, window or full screen. Asks first only if something is drawn on it; any file already saved from it goes to the Recycle Bin |
 | Export 1x–4x | Re-renders the annotations at that resolution |
 
 Export scale is worth understanding: the screenshot is a bitmap and gets no
@@ -276,6 +278,13 @@ stays continuous and in sync.
 for a name and a folder, and moves the finished file there. Cancel that dialog
 and the recording is kept under its automatic name — closing a dialog never
 throws a recording away.
+
+**Retake** throws the take away and starts again straight away — same sources,
+same region or window, the bar where you left it, and *take 2* beside the time
+so you know it happened. **Discard** stops and throws the take away. Neither asks
+"are you sure", because that would slow down the thing they exist to make quick;
+instead a discarded take goes to the Recycle Bin, not away for good, so a
+mistaken click costs nothing.
 
 The control bar never appears in the recording. Neither does the selection
 overlay while a recording is in progress.

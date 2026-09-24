@@ -26,10 +26,17 @@ namespace KamCapture.UI
         private bool _forceChrome;
         private string? _lastSavedPath;
 
-        public EditorWindow(BitmapSource image, AppSettings cfg)
+        // How this capture was taken, so Retake can take it the same way, and
+        // every file saved from it, which a retake throws away with it.
+        private readonly SnipMode _mode;
+        private readonly System.Collections.Generic.List<string> _savedPaths = new();
+
+        public EditorWindow(BitmapSource image, AppSettings cfg, SnipMode mode = SnipMode.Region, string? savedPath = null)
         {
             InitializeComponent();
             _cfg = cfg;
+            _mode = mode;
+            if (savedPath != null) _savedPaths.Add(savedPath);
 
             WindowStyling.ApplyDarkChrome(this);
             try { Icon = BitmapFrame.Create(new Uri("pack://application:,,,/Assets/kam-capture.ico")); } catch { }
@@ -506,6 +513,7 @@ namespace KamCapture.UI
 
                 SaveTo(path, Flatten());
                 _lastSavedPath = path;
+                _savedPaths.Add(path);
                 Flash("Saved to " + path);
             }
             catch (Exception ex)
@@ -525,6 +533,7 @@ namespace KamCapture.UI
             {
                 SaveTo(path, Flatten());
                 _lastSavedPath = path;
+                _savedPaths.Add(path);
                 Flash("Saved as " + SaveAs.Describe(path, _cfg.SaveFolder));
             }
             catch (Exception ex)
@@ -532,6 +541,26 @@ namespace KamCapture.UI
                 MessageBox.Show("Could not save.\n\n" + ex.Message, "KAM Capture Tool",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+        }
+
+        /// <summary>
+        /// This capture was no good: throw it away and take it again the same
+        /// way. What is drawn on it is only asked about, because that is work;
+        /// files already saved from it go to the Recycle Bin, not away for good.
+        /// </summary>
+        private async void OnRetake(object sender, RoutedEventArgs e)
+        {
+            _surface.CommitTextEdit();
+            if (_surface.Doc.Items.Count > 0 &&
+                MessageBox.Show(this, "Throw this capture away, with what is drawn on it, and take it again?",
+                    "KAM Capture Tool", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+                return;
+
+            foreach (var path in _savedPaths)
+                if (Services.RecycleBin.Send(path)) SaveAs.Forget(_cfg, path);
+            _savedPaths.Clear();
+
+            await Services.CaptureController.RetakeAsync(_mode, _cfg, this);
         }
 
         public static void SaveTo(string path, BitmapSource bmp)
@@ -598,6 +627,7 @@ namespace KamCapture.UI
                 switch (e.Key)
                 {
                     case Key.N: OnNewCapture(this, new RoutedEventArgs()); e.Handled = true; return;
+                    case Key.R: OnRetake(this, new RoutedEventArgs()); e.Handled = true; return;
                     case Key.Z: _surface.Undo.Undo(); UpdateChrome(); e.Handled = true; return;
                     case Key.Y: _surface.Undo.Redo(); UpdateChrome(); e.Handled = true; return;
                     case Key.S: OnSave(this, new RoutedEventArgs()); e.Handled = true; return;
