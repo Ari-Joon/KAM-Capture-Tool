@@ -95,7 +95,28 @@ namespace KamCapture.Services
                 copied = true;
             }
 
-            if (result.Action == CaptureAction.Save || cfg.AutoSave)
+            bool savedAs = false;
+            if (result.Action == CaptureAction.SaveAs)
+            {
+                // Chosen by name and folder, instead of the automatic save, not
+                // as well as it: one capture, one file.
+                var chosen = SaveAs.AskForImage(cfg, null);
+                if (chosen != null)
+                {
+                    try
+                    {
+                        EditorWindow.SaveTo(chosen, image);
+                        savedPath = chosen;
+                        saved = savedAs = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Could not save the capture.\n\n" + ex.Message, "KAM Capture Tool",
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+            }
+            else if (result.Action == CaptureAction.Save || cfg.AutoSave)
             {
                 try
                 {
@@ -144,7 +165,10 @@ namespace KamCapture.Services
 
             var parts = new List<string>();
             if (copied) parts.Add("copied to the clipboard");
-            if (saved && savedPath != null) parts.Add("saved as " + Path.GetFileName(savedPath));
+            if (saved && savedPath != null)
+                parts.Add("saved as " + (savedAs ? SaveAs.Describe(savedPath, cfg.SaveFolder) : Path.GetFileName(savedPath)));
+            else if (result.Action == CaptureAction.SaveAs)
+                parts.Add("not saved");
             if (parts.Count > 0)
                 Notified?.Invoke($"{image.PixelWidth} × {image.PixelHeight} — " + string.Join(", ", parts));
         }

@@ -14,7 +14,7 @@ using KamCapture.Settings;
 
 namespace KamCapture.Capture
 {
-    public enum CaptureAction { Cancel, Edit, Copy, Save, Record }
+    public enum CaptureAction { Cancel, Edit, Copy, Save, SaveAs, Record }
 
     public sealed class CaptureResult
     {
@@ -282,6 +282,13 @@ namespace KamCapture.Capture
 
                 case Key.S when Keyboard.Modifiers == ModifierKeys.Control && !_state.ForRecording:
                     if (_state.Selection.Width >= 1) _state.Commit(CaptureAction.Save);
+                    e.Handled = true;
+                    break;
+
+                // F12, as in Office: Ctrl+Shift+S is the region shortcut, and
+                // Windows hands it to the hotkey before this window sees it.
+                case Key.F12 when !_state.ForRecording:
+                    if (_state.Selection.Width >= 1) _state.Commit(CaptureAction.SaveAs);
                     e.Handled = true;
                     break;
 

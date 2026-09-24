@@ -28,7 +28,8 @@ namespace KamCapture.UI
         private readonly DispatcherTimer _tick;
         private bool _ready;
 
-        public event Action<string?>? Stopped;
+        /// <summary>The finished file, and whether Save as was asked for.</summary>
+        public event Action<string?, bool>? Stopped;
 
         private sealed record MicItem(string Label, string? Id)
         {
@@ -206,9 +207,16 @@ namespace KamCapture.UI
             else { _recorder.Pause(); BtnPause.Content = "Resume"; }
         }
 
-        private bool _stopping, _finished;
+        private bool _stopping, _finished, _saveAs;
 
         private void OnStop(object sender, RoutedEventArgs e) => RequestStop();
+
+        private void OnSaveAs(object sender, RoutedEventArgs e)
+        {
+            if (_stopping) return;
+            _saveAs = true;
+            RequestStop();
+        }
 
         /// <summary>
         /// Stop and save, the same as pressing Stop. Safe to call more than once,
@@ -221,7 +229,9 @@ namespace KamCapture.UI
             _ready = false;
             _tick.Stop();
             BtnStop.IsEnabled = false;
-            BtnStop.Content = "Saving…";
+            BtnSaveAs.IsEnabled = false;
+            if (_saveAs) BtnSaveAs.Content = "Saving…";
+            else BtnStop.Content = "Saving…";
             BtnPause.IsEnabled = false;
 
             // Let the button repaint as "Saving…" before ffmpeg is waited on.
@@ -248,8 +258,11 @@ namespace KamCapture.UI
             string? path = null;
             try { path = _recorder.Stop(); }
             catch { }
-            Stopped?.Invoke(path);
+
+            // Gone before anything is asked: the bar stays on top of everything,
+            // and would sit over the Save as dialog.
             Close();
+            Stopped?.Invoke(path, _saveAs);
         }
 
         private void OnDragBar(object sender, MouseButtonEventArgs e)

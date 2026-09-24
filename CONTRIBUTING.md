@@ -29,7 +29,9 @@ dotnet run --project src/KamCapture -- --selftest=out.png
 
 This builds a board containing every annotation type, groups three objects,
 moves and scales the group, checks the scale factor came out right, exports at
-2x and checks the output dimensions. It touches no screen and no window, so it
+2x and checks the output dimensions. It also checks the names Save as suggests:
+the next in a numbered sequence, padding kept, nothing already taken, and no
+counting on the tool's own timestamp names. It touches no screen and no window, so it
 runs in CI. Exit code 0 means the drawing, grouping, transform and export paths
 are intact.
 

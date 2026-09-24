@@ -39,6 +39,14 @@ namespace KamCapture.Settings
         /// <summary>Ask what to call a capture when Save is pressed.</summary>
         public bool AskNameOnSave { get; set; } = true;
 
+        /// <summary>
+        /// Where the last Save as of each kind went. The next one opens there,
+        /// with the number at the end of the name moved on by one.
+        /// </summary>
+        public string LastScreenshotSaveAs { get; set; } = "";
+        public string LastVideoSaveAs { get; set; } = "";
+        public string LastAudioSaveAs { get; set; } = "";
+
         // ---- Editor ----
         public double BoardMargin { get; set; } = 260;
         public string BoardBackground { get; set; } = "#F4F4F2";

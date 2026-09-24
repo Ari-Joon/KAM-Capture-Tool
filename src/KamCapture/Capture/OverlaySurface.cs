@@ -553,6 +553,7 @@ namespace KamCapture.Capture
                     (CaptureAction.Edit,   "Annotate"),
                     (CaptureAction.Copy,   "Copy"),
                     (CaptureAction.Save,   "Save"),
+                    (CaptureAction.SaveAs, "Save as…"),
                     (CaptureAction.Record, "Record"),
                     (CaptureAction.Cancel, "Cancel"),
                 };

@@ -58,6 +58,9 @@ namespace KamCapture.Services
                 if (png.PixelWidth != (int)Math.Ceiling(doc.BoardSize.Width * 2))
                     return Fail("export scale did not apply");
 
+                var naming = CheckNaming();
+                if (naming != null) return Fail("save as naming: " + naming);
+
                 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(outputPath))!);
                 using (var fs = File.Create(outputPath))
                 {
@@ -189,6 +192,15 @@ namespace KamCapture.Services
 
                 if (Math.Abs(recorded - expected) > 0.35)
                     return Fail($"track is {recorded:0.00}s, expected {expected:0.00}s");
+
+                // Save as moves the finished file; move it away and back again.
+                var named = Path.Combine(Path.GetDirectoryName(path)!, "named", "Lecture 1" + Path.GetExtension(path));
+                var moved = UI.SaveAs.Place(path, named);
+                if (moved != named || !File.Exists(named) || File.Exists(path))
+                    return Fail("save as did not move the recording to " + named);
+                UI.SaveAs.Place(named, path);
+                Directory.Delete(Path.GetDirectoryName(named)!);
+                Say("  save as: moved to a chosen name and back");
 
                 Say("audio-test OK");
                 return 0;
@@ -837,6 +849,50 @@ namespace KamCapture.Services
 
         /// <summary>The stand-in screenshot, also used for documentation shots.</summary>
         public static BitmapSource SampleCapture() => BuildSample().Image!;
+
+        /// <summary>
+        /// The names Save as offers. Null when all is well, otherwise what went
+        /// wrong. Pure logic plus one scratch folder, so it runs in CI.
+        /// </summary>
+        private static string? CheckNaming()
+        {
+            const string template = "KAM-{date}-{time}";
+            foreach (var (last, expected) in new (string?, string?)[]
+            {
+                ("Lecture 5 slide 3", "Lecture 5 slide 4"),
+                ("slide 09", "slide 10"),
+                ("slide 99", "slide 100"),
+                ("Part 2 - 007", "Part 2 - 008"),
+                ("Introduction", null),                      // no number: nothing to count on
+                ("KAM-2026-09-24-10-15-22", null),           // the tool's own name: its seconds are not a sequence
+                ("KAM-2026-09-24-10-15-22-2", null),
+                ("", null),
+                (null, null),
+            })
+            {
+                var got = UI.SaveAs.NextInSequence(last, template);
+                if (got != expected) return $"after \"{last}\" expected \"{expected}\", got \"{got}\"";
+            }
+
+            if (!UI.SaveAs.IsAutomatic("2026-09-24-10-15-22", "{datetime}"))
+                return "a {datetime} name was not recognised as automatic";
+
+            // A suggestion never offers a name that is already taken.
+            var dir = Path.Combine(Path.GetTempPath(), "kam-naming-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(dir);
+                File.WriteAllText(Path.Combine(dir, "slide 4.png"), "");
+                var cfg = new Settings.AppSettings { FileNameTemplate = template };
+                var suggested = UI.SaveAs.SuggestName("slide 3", cfg, dir, ".png");
+                if (suggested != "slide 5") return $"with slide 4 taken, expected slide 5, got {suggested}";
+            }
+            finally
+            {
+                try { Directory.Delete(dir, recursive: true); } catch { }
+            }
+            return null;
+        }
 
         private static BoardDocument BuildSample()
         {

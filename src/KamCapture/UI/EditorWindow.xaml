@@ -71,6 +71,8 @@
                     <Button x:Name="BtnSave" Style="{StaticResource PrimaryButton}" Margin="0,0,6,0"
                             Padding="16,7" VerticalAlignment="Center"
                             Content="Save" ToolTip="Save a PNG to your captures folder  (Ctrl+S)" Click="OnSave"/>
+                    <Button x:Name="BtnSaveAs" Style="{StaticResource BarButton}"
+                            Content="Save as…" ToolTip="Choose the name, the folder and the format  (F12)" Click="OnSaveAs"/>
                     <Button x:Name="BtnCopy" Style="{StaticResource BarButton}"
                             Content="Copy" ToolTip="Copy the whole board to the clipboard  (Ctrl+Shift+C)" Click="OnCopy"/>
 
@@ -262,7 +264,7 @@
                         <Separator/>
                         <MenuItem Header="Select all" InputGestureText="Ctrl+A" Click="OnSelectAll"/>
                         <Separator/>
-                        <MenuItem Header="Save as..." Click="OnSaveAs"/>
+                        <MenuItem Header="Save as…" InputGestureText="F12" Click="OnSaveAs"/>
                     </ContextMenu>
                 </Border.ContextMenu>
             </Border>

@@ -162,7 +162,7 @@ namespace KamCapture.Services
             return RecordTarget.WindowTarget(window);
         }
 
-        private static void OnBarStopped(string? path)
+        private static void OnBarStopped(string? path, bool saveAs)
         {
             var recorder = _active;
             _active = null;
@@ -173,13 +173,19 @@ namespace KamCapture.Services
             bool audio = recorder?.IsAudioOnly == true;
             try { recorder?.Dispose(); } catch { }
 
-            FindMain()?.Show();
+            var main = FindMain();
+            main?.Show();
 
             if (path != null && File.Exists(path))
             {
+                var cfg = AppSettings.Current;
+                if (saveAs) path = SaveAs.AskForRecording(cfg, path, audio, main);
+
                 var size = new FileInfo(path).Length;
-                // The name, not the path: the folder is one button away.
-                Notified?.Invoke($"{(audio ? "Audio" : "Video")} saved as {Path.GetFileName(path)}, " +
+                // The name, not the path: the folder is one button away. Named
+                // somewhere else, the folder's name comes too.
+                Notified?.Invoke($"{(audio ? "Audio" : "Video")} saved as " +
+                                 $"{SaveAs.Describe(path, audio ? cfg.AudioFolder : cfg.RecordFolder)}, " +
                                  $"{size / 1024.0 / 1024.0:0.0} MB");
             }
         }

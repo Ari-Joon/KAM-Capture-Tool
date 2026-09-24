@@ -181,11 +181,12 @@ silently failing.
 | `M` | Toggle the pixel magnifier |
 | `Enter` or double-click | Annotate |
 | `Ctrl+C` / `Ctrl+S` | Copy / save straight away |
+| `F12` | Save as — choose the name and the folder |
 | Right-click | Clear the selection |
 | `Esc` | Cancel |
 
 After releasing the mouse a small bar appears: **Annotate**, **Copy**, **Save**,
-**Record** (records that exact region), **Cancel**.
+**Save as…**, **Record** (records that exact region), **Cancel**.
 
 When the overlay was opened to record a video, the bar is **Start recording** and
 **Cancel**, `Enter` or a double-click starts it, and in window mode the click on
@@ -238,6 +239,7 @@ the board, so neither can be lost off the edge.
 | | |
 |---|---|
 | `Ctrl+S` | Save a PNG to the captures folder |
+| `F12` or **Save as…** | Choose the name, the folder and the format — PNG, JPEG or BMP |
 | `Ctrl+Shift+C` | Copy the whole board to the clipboard |
 | `Ctrl+N` or **New capture** | Take another capture — this annotator stays open, work and all |
 | Export 1x–4x | Re-renders the annotations at that resolution |
@@ -269,6 +271,11 @@ interrupt the file: the mixer's output stream keeps running, so the audio track
 stays continuous and in sync.
 
 **Pause** leaves the paused stretch out of the file, picture and sound alike.
+
+**Stop** saves under the automatic name. **Save as…** beside it stops, then asks
+for a name and a folder, and moves the finished file there. Cancel that dialog
+and the recording is kept under its automatic name — closing a dialog never
+throws a recording away.
 
 The control bar never appears in the recording. Neither does the selection
 overlay while a recording is in progress.
@@ -310,6 +317,26 @@ sound underneath, put together afterwards in an editor.
 
 Screenshots are named to the second, and one taken in the same second as the
 last is saved as `…-2` rather than replacing it.
+
+To name the slides as you go instead, leave **Save a PNG straight away** off,
+drag each one with `Ctrl+Shift+S` and press **Save as…** (or `F12`). Name the
+first *Lecture 5 slide 1* in a folder of its own; every Save as after it opens in
+that folder with the next number already filled in, so the rest are Enter.
+
+## Save as
+
+Screenshots, videos and audio all have it: on the selection bar and in the
+annotator for a screenshot (`F12` in both), and beside **Stop** on the recording
+bar. Each kind remembers where its last Save as went, and opens there next time.
+
+If the last name ended in a number, the suggestion is the next one —
+*slide 9* is followed by *slide 10*, *slide 09* by *slide 10* — stepping past any
+name already taken, so accepting it never overwrites anything. After a name the
+tool made up itself, whose last number is only the seconds of a timestamp, the
+suggestion is a fresh automatic name instead.
+
+`Ctrl+Shift+S` would be the usual shortcut, but it is the region shortcut, and
+Windows hands it to that before any window sees it; `F12` is what Office uses.
 
 ## Troubleshooting
 

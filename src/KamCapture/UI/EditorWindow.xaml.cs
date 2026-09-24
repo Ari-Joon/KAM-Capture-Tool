@@ -518,20 +518,14 @@ namespace KamCapture.UI
         private void OnSaveAs(object sender, RoutedEventArgs e)
         {
             _surface.CommitTextEdit();
-            var dlg = new Microsoft.Win32.SaveFileDialog
-            {
-                Filter = "PNG image (*.png)|*.png|JPEG image (*.jpg)|*.jpg|Bitmap (*.bmp)|*.bmp",
-                FileName = _cfg.BuildFileName(".png"),
-                InitialDirectory = _cfg.EnsureSaveFolder(),
-                Title = "Save capture"
-            };
-            if (dlg.ShowDialog(this) != true) return;
+            var path = SaveAs.AskForImage(_cfg, this);
+            if (path == null) return;
 
             try
             {
-                SaveTo(dlg.FileName, Flatten());
-                _lastSavedPath = dlg.FileName;
-                Flash("Saved to " + dlg.FileName);
+                SaveTo(path, Flatten());
+                _lastSavedPath = path;
+                Flash("Saved as " + SaveAs.Describe(path, _cfg.SaveFolder));
             }
             catch (Exception ex)
             {
@@ -591,10 +585,13 @@ namespace KamCapture.UI
                 Keyboard.FocusedElement is TextBoxBase or ComboBox or ComboBoxItem)
             {
                 if (ctrl && e.Key == Key.S) { OnSave(this, new RoutedEventArgs()); e.Handled = true; }
+                else if (e.Key == Key.F12) { OnSaveAs(this, new RoutedEventArgs()); e.Handled = true; }
                 else if (ctrl && shift && e.Key == Key.C) { OnCopy(this, new RoutedEventArgs()); e.Handled = true; }
                 else if (ctrl && e.Key == Key.N) { OnNewCapture(this, new RoutedEventArgs()); e.Handled = true; }
                 return;
             }
+
+            if (e.Key == Key.F12) { OnSaveAs(this, new RoutedEventArgs()); e.Handled = true; return; }
 
             if (ctrl)
             {

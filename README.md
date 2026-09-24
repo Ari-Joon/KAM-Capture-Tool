@@ -258,6 +258,23 @@ running*; the rest of the time it stays visible to other capture tools, because
 making this application unphotographable would be an odd thing to do to someone
 who wants to show you a bug in it.
 
+## Naming as you save
+
+A folder of `KAM-2026-09-24-10-15-22.png` files is a folder you will be renaming
+later, one at a time, having opened each to remember what it was.
+
+So screenshots, videos and audio all have **Save as…** — on the selection bar and
+in the annotator (`F12`), and beside **Stop** on the recording bar. Each kind
+opens where its last Save as went, and when the last name ended in a number the
+next one is already filled in: after *Lecture 5 slide 3* comes *Lecture 5 slide
+4*, padding kept, stepping past any name already taken. Naming a deck of slides
+is then mostly pressing Enter. A name the tool made up is not counted on, because
+its last number is the seconds of a timestamp.
+
+A recording is written under its automatic name while it runs, and Save as moves
+the finished file. Cancel the dialog and it stays where it is: closing a dialog
+never throws a recording away.
+
 ## Nothing cut off
 
 A window with a fixed size and text that changes will eventually be asked to
@@ -426,7 +443,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.4.0. Everything described above is implemented and works.
+Version 1.5.0. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
@@ -441,6 +458,7 @@ Version 1.4.0. Everything described above is implemented and works.
 | Audio-only recording to MP3, M4A or WAV, with the same live switching | Done |
 | Pause that leaves the paused stretch out of the file | Done |
 | A folder and an Open button for each kind of output | Done |
+| Save as for screenshots, videos and audio, with the next name filled in | Done |
 | Layout check: nothing cut off, in any window, in CI | Done |
 | Self-install, shortcuts, uninstall entry | Done |
 | Updates from GitHub, with a prompt | Done |

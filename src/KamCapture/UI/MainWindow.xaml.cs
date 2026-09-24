@@ -340,7 +340,7 @@ namespace KamCapture.UI
 
             var format = (_cfg.AudioFormat ?? "mp3").ToUpperInvariant();
             LblNote.Text = recording
-                ? "Recording. Switch sources on or off from the recording bar."
+                ? "Recording. The bar at the bottom switches sources, stops, or saves as."
                 : anySource
                     ? $"Saved as {format}. Either source can be switched on or off while it records."
                     : "Choose system audio, the microphone, or both.";
