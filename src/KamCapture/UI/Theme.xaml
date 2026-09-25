@@ -117,6 +117,45 @@
         </Setter>
     </Style>
 
+    <!-- STOP: ends everything and keeps nothing, so it must not look like
+         the buttons that keep things. Red outline, capitals, bold. -->
+    <Style TargetType="Button" x:Key="StopButton" BasedOn="{StaticResource GhostButton}">
+        <Setter Property="Background" Value="#FF2A1413"/>
+        <Setter Property="BorderBrush" Value="{StaticResource Danger}"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="root" RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <ScaleTransform x:Name="squash" ScaleX="1" ScaleY="1"/>
+                        </Grid.RenderTransform>
+                        <Border x:Name="b" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"/>
+                        <Border x:Name="hover" Background="#FF4A1A17" BorderBrush="{StaticResource Danger}"
+                                BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6"
+                                Opacity="0" IsHitTestVisible="False"/>
+                        <Border x:Name="press" Background="#FF6A1E19" CornerRadius="6"
+                                Opacity="0" IsHitTestVisible="False"/>
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.14"><DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction></DoubleAnimation></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="hover" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.14"/></Storyboard></BeginStoryboard></Trigger.ExitActions></Trigger>
+                        <Trigger Property="IsPressed" Value="True"><Trigger.EnterActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="press" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.09"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleX" To="0.98" Duration="0:0:0.09"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleY" To="0.98" Duration="0:0:0.09"/></Storyboard></BeginStoryboard></Trigger.EnterActions><Trigger.ExitActions><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetName="press" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.12"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleX" To="1" Duration="0:0:0.12"/><DoubleAnimation Storyboard.TargetName="squash" Storyboard.TargetProperty="ScaleY" To="1" Duration="0:0:0.12"/></Storyboard></BeginStoryboard></Trigger.ExitActions></Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="root" Property="Opacity" Value="0.45"/>
+                            <Setter Property="Cursor" Value="Arrow"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style TargetType="Button" BasedOn="{StaticResource GhostButton}"/>
 
     <!-- ===================== Tool toggle ===================== -->

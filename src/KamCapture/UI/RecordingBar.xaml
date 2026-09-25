@@ -34,8 +34,9 @@
                     Margin="6,0,0,0" MinWidth="70" Click="OnSave" ToolTip="Finish and save under the automatic name"/>
             <Button x:Name="BtnSaveAs" Content="Save as…" Margin="6,0,0,0" Click="OnSaveAs"
                     ToolTip="Finish, then choose the name and the folder"/>
-            <Button x:Name="BtnStop" Content="Stop" Margin="6,0,0,0" MinWidth="70" Click="OnStop"
-                    ToolTip="Stop without saving and go back to the home window. The take goes to the Recycle Bin."/>
+            <Button x:Name="BtnStop" Style="{StaticResource StopButton}" Content="STOP" Margin="6,0,0,0"
+                    MinWidth="70" Click="OnStop"
+                    ToolTip="STOP: end the recording without saving it, and go back to the home window. The take goes to the Recycle Bin."/>
 
             <Border Width="1" Background="{StaticResource Edge}" Margin="12,3"/>
 

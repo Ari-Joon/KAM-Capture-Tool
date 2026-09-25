@@ -462,10 +462,10 @@ namespace KamCapture.Capture
             };
             string text = (_s.ForRecording, _s.Mode == SnipMode.Window) switch
             {
-                (true, true) => "Click the window to record it     Esc cancel",
-                (true, false) => "Drag the area to record, then Start recording     Ctrl+A whole screen  ·  Esc cancel",
-                (false, true) => "Click a window to capture it     C capture  ·  M magnifier  ·  Esc cancel",
-                _ => "Drag to select     Ctrl+A whole screen  ·  W window  ·  M magnifier  ·  Esc cancel"
+                (true, true) => "Click the window to record it     Esc STOP",
+                (true, false) => "Drag the area to record, then Start recording     Ctrl+A whole screen  ·  Esc STOP",
+                (false, true) => "Click a window to capture it     C capture  ·  M magnifier  ·  Esc STOP",
+                _ => "Drag to select     Ctrl+A whole screen  ·  W window  ·  M magnifier  ·  Esc STOP"
             };
 
             var title = Text(_s.ForRecording ? $"KAM Capture — record a {mode.ToLowerInvariant()}" : $"KAM Capture — {mode}",
@@ -546,7 +546,7 @@ namespace KamCapture.Capture
                 ? new (CaptureAction Action, string Label)[]
                 {
                     (CaptureAction.Record, "Start recording"),
-                    (CaptureAction.Cancel, "Cancel"),
+                    (CaptureAction.Cancel, "STOP"),
                 }
                 : new (CaptureAction Action, string Label)[]
                 {
@@ -555,7 +555,7 @@ namespace KamCapture.Capture
                     (CaptureAction.Save,   "Save"),
                     (CaptureAction.SaveAs, "Save as…"),
                     (CaptureAction.Record, "Record"),
-                    (CaptureAction.Cancel, "Cancel"),
+                    (CaptureAction.Cancel, "STOP"),
                 };
 
             double h = 34 * U, padX = 13 * U, gap = 4 * U, edgePad = 5 * U;
@@ -563,7 +563,8 @@ namespace KamCapture.Capture
             double total = edgePad * 2;
             foreach (var it in items)
             {
-                var ft = Text(it.Label, 12.5 * U, Brushes.White, it.Action == CaptureAction.Edit);
+                var ft = Text(it.Label, 12.5 * U, Brushes.White,
+                              it.Action is CaptureAction.Edit or CaptureAction.Cancel);
                 texts.Add(ft);
                 total += ft.Width + padX * 2 + gap;
             }
@@ -607,9 +608,13 @@ namespace KamCapture.Capture
                 }
                 else if (danger)
                 {
-                    var b = new SolidColorBrush(Color.FromArgb(40, 229, 52, 42));
+                    // STOP: nothing is kept. Outlined in red, like STOP on the
+                    // recording bar, so it cannot be mistaken for the others.
+                    var b = new SolidColorBrush(Color.FromArgb(64, 229, 52, 42));
                     b.Freeze();
-                    dc.DrawRoundedRectangle(b, null, r, 5 * U, 5 * U);
+                    var outline = new Pen(new SolidColorBrush(Color.FromRgb(229, 52, 42)), 1.5 * U);
+                    outline.Brush.Freeze();
+                    dc.DrawRoundedRectangle(b, outline, r, 5 * U, 5 * U);
                 }
 
                 dc.DrawText(ft, new Point(r.X + padX, r.Y + (r.Height - ft.Height) / 2));

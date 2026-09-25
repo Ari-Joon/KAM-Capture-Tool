@@ -107,6 +107,30 @@ namespace KamCapture.Services
                         outputDir, cut, trimmed);
                 }
 
+                // The recording bar's transport, in its own styles. The bar itself
+                // cannot be built without a live recorder, and hides from every
+                // screenshot on purpose, so this is how its buttons get looked at.
+                var transport = new System.Windows.Controls.StackPanel
+                {
+                    Orientation = System.Windows.Controls.Orientation.Horizontal,
+                    Margin = new Thickness(12),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                foreach (var (label, style) in new[] { ("Pause", ""), ("Retake", ""), ("Save", "PrimaryButton"),
+                                                       ("Save as…", ""), ("STOP", "StopButton") })
+                {
+                    var b = new System.Windows.Controls.Button { Content = label, Margin = new Thickness(0, 0, 6, 0), MinWidth = 70 };
+                    if (style.Length > 0) b.Style = (Style)Application.Current.FindResource(style);
+                    transport.Children.Add(b);
+                }
+                var barWindow = new Window
+                {
+                    Content = transport,
+                    Background = (System.Windows.Media.Brush)Application.Current.FindResource("Navy"),
+                    Width = 460 + FrameWidth, Height = 56 + FrameHeight
+                };
+                Check(barWindow, barWindow.Width, barWindow.Height, "recording-bar-buttons", outputDir, cut, trimmed);
+
                 var naming = new NameDialog("KAM-2026-09-24-10-15-22", cfg.SaveFolder);
                 Check(naming, naming.Width, MeasuredHeight(naming), "name-dialog", outputDir, cut, trimmed);
 

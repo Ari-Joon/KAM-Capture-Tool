@@ -196,10 +196,11 @@ silently failing.
 | `Esc` | Cancel |
 
 After releasing the mouse a small bar appears: **Annotate**, **Copy**, **Save**,
-**Save as…**, **Record** (records that exact region), **Cancel**.
+**Save as…**, **Record** (records that exact region), and **STOP**, outlined in
+red, which ends the selection and keeps nothing — as `Esc` does.
 
 When the overlay was opened to record a video, the bar is **Start recording** and
-**Cancel**, `Enter` or a double-click starts it, and in window mode the click on
+**STOP**, `Enter` or a double-click starts it, and in window mode the click on
 the window is the decision — the recording starts there and then.
 
 ## In the annotator
@@ -283,16 +284,16 @@ stays continuous and in sync.
 
 **Pause** leaves the paused stretch out of the file, picture and sound alike.
 
-The bar reads **Pause · Retake · Save · Save as… · Stop**.
+The bar reads **Pause · Retake · Save · Save as… · STOP**.
 
 | | |
 |---|---|
 | **Save** | Finish and save under the automatic name |
 | **Save as…** | Finish, then choose the name and folder; the finished file is moved there. Cancel that dialog and it is kept under its automatic name |
 | **Retake** | Throw this take away and start again straight away — same sources, same region or window, the bar where you left it, and *take 2* beside the time |
-| **Stop** | End everything without saving, and bring the home window back to the front |
+| **STOP** | End everything without saving, and bring the home window back to the front. Capitals and a red outline, because it is the one that keeps nothing |
 
-Retake and Stop never ask "are you sure", because that would slow down the thing
+Retake and STOP never ask "are you sure", because that would slow down the thing
 they exist to make quick; instead the take they throw away goes to the Recycle
 Bin, not away for good, so a mistaken click costs nothing. The home window's
 **Save recording**, the tray and `Ctrl+Shift+R` all save, like **Save**.

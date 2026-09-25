@@ -19,9 +19,9 @@
     <Product>KAM Capture Tool</Product>
     <AssemblyTitle>KAM Capture Tool</AssemblyTitle>
     <Company>KAM</Company>
-    <Version>1.7.0</Version>
-    <FileVersion>1.7.0.0</FileVersion>
-    <InformationalVersion>1.7.0</InformationalVersion>
+    <Version>1.7.1</Version>
+    <FileVersion>1.7.1.0</FileVersion>
+    <InformationalVersion>1.7.1</InformationalVersion>
     <Copyright>Copyright (c) 2026 KAM</Copyright>
 
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

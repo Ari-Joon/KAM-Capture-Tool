@@ -258,7 +258,7 @@ namespace KamCapture.UI
                 case TakeOutcome.Save: BtnSave.Content = "Saving…"; break;
                 case TakeOutcome.SaveAs: BtnSaveAs.Content = "Saving…"; break;
                 case TakeOutcome.Retake: BtnRetake.Content = "Starting again…"; break;
-                case TakeOutcome.Stop: BtnStop.Content = "Stopping…"; break;
+                case TakeOutcome.Stop: BtnStop.Content = "STOPPING…"; break;
             }
 
             // Let the button repaint as "Saving…" before ffmpeg is waited on.

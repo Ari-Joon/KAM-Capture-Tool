@@ -316,15 +316,17 @@ A bad take that gets saved is a file you find and delete later, usually after
 listening to enough of it to be sure. Recording a lecture's worth of audio, that
 adds up.
 
-The recording bar reads **Pause · Retake · Save · Save as… · Stop**. Two ways to
+The recording bar reads **Pause · Retake · Save · Save as… · STOP**. Two ways to
 keep a take, and two not to:
 
 - **Retake** throws the take away and starts again straight away — same sources,
   same region or window, the bar where you left it, *take 2* beside the time.
-- **Stop** ends everything without saving, and brings the home window back to
-  the front.
+- **STOP** ends everything without saving, and brings the home window back to
+  the front. It is in capitals and outlined in red, because it is the one
+  button that keeps nothing — the same STOP, in the same red, ends a screenshot
+  selection.
 
-**Save** is what used to be labelled Stop; it was renamed so that Stop could mean
+**Save** is what used to be labelled Stop; it was renamed so that STOP could mean
 stop. The annotator has **Retake** (`Ctrl+R`) for a screenshot: the capture is
 thrown away and taken again the same way.
 
@@ -508,7 +510,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.7.0. Everything described above is implemented and works.
+Version 1.7.1. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
