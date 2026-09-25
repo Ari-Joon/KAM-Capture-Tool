@@ -54,6 +54,18 @@ namespace KamCapture.Setup
         public static string DefaultTarget => Where.DefaultTarget;
 
         public static string CurrentExe => Environment.ProcessPath ?? "";
+
+        /// <summary>
+        /// True for the complete program — the single self-contained file that
+        /// is released. False for a development build, whose .exe is a small
+        /// launcher for the KamCapture.dll beside it. Only the complete program
+        /// may install itself: copied on its own, the launcher cannot start, and
+        /// an installed copy that cannot start is a desktop icon that does
+        /// nothing. That happened once, from a test build; it cannot again.
+        /// </summary>
+        public static bool IsCompleteProgram =>
+            Services.Sandbox.Active ||
+            !File.Exists(Path.Combine(Path.GetDirectoryName(CurrentExe) ?? "", "KamCapture.dll"));
         public static string CurrentDir => Path.GetDirectoryName(CurrentExe) ?? "";
 
         public static string? InstalledDir

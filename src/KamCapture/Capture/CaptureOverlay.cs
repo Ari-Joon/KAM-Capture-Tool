@@ -52,6 +52,35 @@ namespace KamCapture.Capture
             var snap = snapshot ?? ScreenGrabber.CaptureVirtualDesktop(cfg.IncludeCursor);
             var state = new OverlayState(snap, cfg, mode) { ForRecording = forRecording };
 
+            // Whole-screen modes need no interaction, so no overlay either: the
+            // choice was made before it would have opened. Full screen is the
+            // display under the pointer; FullScreen, every display at once.
+            //
+            // These used to commit with the overlay already showing, before
+            // anything was listening for the commit. It went unheard, the
+            // overlay sat waiting for a click, and Esc turned the finished
+            // capture into a cancel — so "take the whole screen" never simply did.
+            if (mode is SnipMode.FullScreen or SnipMode.Monitor)
+            {
+                if (mode == SnipMode.FullScreen)
+                {
+                    state.Selection = new Rect(snap.OriginX, snap.OriginY, snap.Width, snap.Height);
+                }
+                else
+                {
+                    var m = Screens.FromCursor();
+                    state.Selection = new Rect(m.X, m.Y, m.Width, m.Height);
+                }
+                state.Settled = true;
+                state.Commit(state.PrimaryAction);
+                return state.Result;
+            }
+
+            // Listening before anything can finish, so no commit goes unheard.
+            var frame = new DispatcherFrame();
+            bool finished = false;
+            state.Finished += () => { finished = true; frame.Continue = false; };
+
             var windows = new List<OverlayWindow>();
             foreach (var m in Screens.All())
                 windows.Add(new OverlayWindow(m, state));
@@ -61,29 +90,8 @@ namespace KamCapture.Capture
             windows[0].Activate();
             windows[0].Focus();
 
-            // Whole-screen modes need no interaction at all.
-            if (mode == SnipMode.FullScreen)
-            {
-                state.Selection = new Rect(snap.OriginX, snap.OriginY, snap.Width, snap.Height);
-                state.Settled = true;
-                state.Commit(state.PrimaryAction);
-            }
-            else if (mode == SnipMode.Monitor)
-            {
-                // Full screen means the display under the pointer, taken at
-                // once; asking for a click on it would confirm a choice
-                // already made.
-                var m = Screens.FromCursor();
-                state.Selection = new Rect(m.X, m.Y, m.Width, m.Height);
-                state.Settled = true;
-                state.Commit(state.PrimaryAction);
-            }
-
-            var frame = new DispatcherFrame();
-            state.Finished += () => frame.Continue = false;
-
             Log.Info($"Overlay open on {windows.Count} display(s)");
-            Dispatcher.PushFrame(frame);
+            if (!finished) Dispatcher.PushFrame(frame);
 
             foreach (var w in windows)
             {

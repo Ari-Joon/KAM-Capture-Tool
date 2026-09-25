@@ -205,13 +205,13 @@
                         <CheckBox x:Name="ChkHotkeys" Content="Enable global shortcuts" Margin="0,0,0,14"/>
 
                         <StackPanel Style="{StaticResource Row}">
-                            <TextBlock Style="{StaticResource RowLabel}" Text="Capture"/>
+                            <TextBlock Style="{StaticResource RowLabel}" Text="Region"/>
                             <ContentControl x:Name="HostHkRegion" Width="160"/>
                             <TextBlock Style="{StaticResource RowLabel}" Text="Window" Width="74" Margin="20,0,0,0"/>
                             <ContentControl x:Name="HostHkWindow" Width="160"/>
                         </StackPanel>
                         <StackPanel Style="{StaticResource Row}">
-                            <TextBlock Style="{StaticResource RowLabel}" Text="Monitor"/>
+                            <TextBlock Style="{StaticResource RowLabel}" Text="Full screen"/>
                             <ContentControl x:Name="HostHkFull" Width="160"/>
                             <TextBlock Style="{StaticResource RowLabel}" Text="Record" Width="74" Margin="20,0,0,0"/>
                             <ContentControl x:Name="HostHkRecord" Width="160"/>

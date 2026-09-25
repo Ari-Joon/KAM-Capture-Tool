@@ -43,6 +43,8 @@ signed. *More info* then *Run anyway*.
 | `--audiotest=<file>,<seconds>[,<pause>]` | Record sound only to `.mp3`, `.m4a` or `.wav`, switching system audio off and on mid-take, and check the length |
 | `--docshots=<dir>` | Render the windows to PNGs offscreen, for documentation |
 | `--retaketest[=<dir>]` | Retake then Stop an audio take through the real controller, and check both takes went to the Recycle Bin; shows the recording bar briefly, and removes its takes from the bin afterwards |
+| `--mixtest[=<dir>]` | Play a quiet tone through each output from another process and record it while every microphone is switched; checks system audio is heard and unaffected. Audible |
+| `--audiodiag` | List the default devices and which output each program is playing through; changes nothing |
 | `--layoutcheck[=<dir>]` | Lay out every window offscreen, in the states that stretch it, and fail if anything is cut off; writes a PNG of each state |
 
 The checks run alongside a copy that is already in the tray. Setup commands
@@ -70,6 +72,13 @@ Three things across the top, and what each one needs underneath it.
 | **Screenshot** | Region, Window or Full screen, and a delay | — | Take screenshot |
 | **Video** | Region, Window or Full screen | System audio and the microphone, each with its device | Start recording |
 | **Audio** | — | System audio and the microphone, each with its device | Start recording audio |
+
+**System audio** is taken from **Every output** unless you pick one: whatever the
+computer plays is recorded, whichever output it plays through, and an output that
+appears during a take — headphones plugged in — is picked up within two seconds.
+The microphone list says which device *Default* means right now, because it is
+not always the one you would guess: a headset jack can be Windows' default
+microphone while you talk into a USB one.
 
 **Region** is dragged on the overlay, **Window** is a click on the window, and
 **Full screen** is the display under the pointer, taken without a click.
@@ -165,7 +174,7 @@ silently failing.
 |---|---|
 | `Ctrl+Shift+S` | Capture a region |
 | `Ctrl+Shift+W` | Capture a window |
-| `Ctrl+Shift+F` | Capture everything |
+| `Ctrl+Shift+F` | Screenshot the full screen — the display the pointer is on |
 | `Ctrl+Shift+R` | Record video, or save whatever is recording |
 
 ## While selecting
@@ -323,8 +332,11 @@ sound underneath, put together afterwards in an editor.
 2. On the home window, **Audio**, with **System audio** set to the output the call
    plays through. Add the microphone if your own voice belongs in it.
 3. Start recording audio, then press `Ctrl+Shift+F` on each new slide. It takes
-   everything on screen — on more than one display, all of them — and the
-   home window stays where it was rather than jumping in front of the call.
+   the display the pointer is on, at once, and the home window stays where it
+   was rather than jumping in front of the call.
+4. Glance at the recording bar before settling in: it has a meter for system
+   audio and one for the microphone. With the call talking, the system audio
+   meter should move.
 
 Screenshots are named to the second, and one taken in the same second as the
 last is saved as `…-2` rather than replacing it.
@@ -357,6 +369,13 @@ unusual; the log will say what was detected.
 
 **Recording will not start.** ffmpeg was not found. Settings shows where it
 looked; *Find* locates it or lets you point at it.
+
+**A recording has no system audio.** Watch the system audio meter on the
+recording bar while something plays. If it stays flat, the log's *Take ended*
+line says which devices were recorded and how loud each got, and
+`KamCapture.exe --audiodiag` lists which output every program is playing
+through. A program using an output in exclusive mode cannot be recorded by
+anything.
 
 **A shortcut does nothing.** Another program owns that combination. KAM shows a
 notification listing the ones it could not register.

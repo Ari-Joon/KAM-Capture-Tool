@@ -62,9 +62,9 @@ namespace KamCapture.UI
 
             CmbDefaultMode.ItemsSource = new[]
             {
-                new Item("Capture", SnipMode.Region),
+                new Item("Region", SnipMode.Region),
                 new Item("Window", SnipMode.Window),
-                new Item("Monitor", SnipMode.Monitor),
+                new Item("Full screen", SnipMode.Monitor),
             };
 
             CmbDelay.ItemsSource = new[]

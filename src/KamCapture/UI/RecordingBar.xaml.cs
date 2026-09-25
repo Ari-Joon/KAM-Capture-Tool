@@ -57,6 +57,13 @@ namespace KamCapture.UI
 
         private int _sizeTicks;
 
+        private static void ShowLevel(Border meter, ScaleTransform scale, float level)
+        {
+            double peak = Math.Clamp(level, 0, 1);
+            scale.ScaleY = peak;
+            meter.Background = peak > 0.94 ? MeterRed : peak > 0.7 ? MeterAmber : MeterGreen;
+        }
+
         public RecordingBar(ScreenRecorder recorder, AppSettings cfg, int take = 1, (int X, int Y)? placeAt = null)
         {
             _placeAt = placeAt;
@@ -88,7 +95,7 @@ namespace KamCapture.UI
 
         private void LoadMicrophones(string? selectedId)
         {
-            var items = new List<MicItem> { new("Default microphone", "") };
+            var items = new List<MicItem> { new(AudioDevices.DefaultMicrophoneLabel(), "") };
             foreach (var d in AudioDevices.Inputs())
                 items.Add(new MicItem(d.Name, d.Id));
 
@@ -131,9 +138,8 @@ namespace KamCapture.UI
                 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
                 : $"{t.Minutes:00}:{t.Seconds:00}";
 
-            double peak = Math.Clamp(_recorder.AudioPeak, 0, 1);
-            MeterScale.ScaleY = peak;
-            Meter.Background = peak > 0.94 ? MeterRed : peak > 0.7 ? MeterAmber : MeterGreen;
+            ShowLevel(SystemMeter, SystemMeterScale, _recorder.SourcePeak("system"));
+            ShowLevel(MicMeter, MicMeterScale, _recorder.SourcePeak("mic"));
 
             if (_recorder.IsAudioOnly)
             {

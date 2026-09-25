@@ -260,8 +260,8 @@ namespace KamCapture.UI
 
         private void LoadDevices()
         {
-            FillDevices(CmbOutput, "Default output", AudioDevices.Outputs(), _cfg.SystemAudioDeviceId);
-            FillDevices(CmbMic, "Default microphone", AudioDevices.Inputs(), _cfg.MicrophoneDeviceId);
+            FillDevices(CmbOutput, AudioDevices.EveryOutputLabel, AudioDevices.Outputs(), _cfg.SystemAudioDeviceId);
+            FillDevices(CmbMic, AudioDevices.DefaultMicrophoneLabel(), AudioDevices.Inputs(), _cfg.MicrophoneDeviceId);
         }
 
         private void FillDevices(ComboBox box, string defaultLabel, System.Collections.Generic.List<AudioDevice> devices, string selectedId)
@@ -287,9 +287,9 @@ namespace KamCapture.UI
         private void OnDevicesOpened(object? sender, EventArgs e)
         {
             if (sender == CmbOutput)
-                FillDevices(CmbOutput, "Default output", AudioDevices.Outputs(), _cfg.SystemAudioDeviceId);
+                FillDevices(CmbOutput, AudioDevices.EveryOutputLabel, AudioDevices.Outputs(), _cfg.SystemAudioDeviceId);
             else if (sender == CmbMic)
-                FillDevices(CmbMic, "Default microphone", AudioDevices.Inputs(), _cfg.MicrophoneDeviceId);
+                FillDevices(CmbMic, AudioDevices.DefaultMicrophoneLabel(), AudioDevices.Inputs(), _cfg.MicrophoneDeviceId);
         }
 
         private void OnSoundToggled(object sender, RoutedEventArgs e)

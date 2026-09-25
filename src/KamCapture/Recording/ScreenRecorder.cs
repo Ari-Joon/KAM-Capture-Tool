@@ -182,6 +182,9 @@ namespace KamCapture.Recording
         public long FramesDuplicated { get; private set; }
         public float AudioPeak => _audio?.LastPeak ?? 0;
 
+        /// <summary>The level one source reached just now — "system" or "mic".</summary>
+        public float SourcePeak(string key) => _audio?.PeakOf(key) ?? 0;
+
         public event Action<string>? Failed;
         public event Action<string>? Finished;
 

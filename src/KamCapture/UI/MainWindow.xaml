@@ -225,7 +225,7 @@
                               ToolTip="Whatever the computer plays: a Teams call, a video, the lecture"/>
                     <ComboBox x:Name="CmbOutput" Width="340" VerticalAlignment="Center"
                               SelectionChanged="OnOutputChanged" DropDownOpened="OnDevicesOpened"
-                              ToolTip="Take system audio from this output. Pick the one Teams plays through."/>
+                              ToolTip="Every output records whatever the computer plays, through whichever output it plays. Pick one to record only that."/>
                 </StackPanel>
 
                 <StackPanel x:Name="RowMic" Orientation="Horizontal" Margin="0,0,0,8">

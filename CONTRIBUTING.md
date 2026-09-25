@@ -79,7 +79,8 @@ The rest run on your machine rather than in CI:
 | Check | What it proves |
 |---|---|
 | `--ghosttest` | The tool's own windows leave nothing in a desktop grab. Scores each hiding strategy, and fails if the one in use leaks more than 2% |
-| `--lifecycletest` | After a capture, the home window and any open annotator come back where they should |
+| `--lifecycletest` | After a capture, the home window and any open annotator come back where they should, and Retake — pressed for real on a full-screen capture — replaces the annotator without the home window flashing up. It found full screen waiting for a click it did not need |
+| `--mixtest` | System audio is heard from every output, and switching any microphone leaves it alone. Plays a quiet tone, so it is audible |
 | `--foldertest` | A OneDrive folder Windows chose is moved back to local disk; one you confirmed is left alone |
 | `--updatetest` | Versions compare number by number, GitHub's reply is read correctly, a download that fails its checksum is refused and removed, a failed program swap puts the old one back, and a download opened over a running copy is offered as an update. No network |
 | `--retaketest` | Retake and Stop through the real controller: a retake starts take 2, a stop ends it without saving, the folder is left empty, and both takes are in the Recycle Bin — which the test then clears of them. Shows the recording bar for a few seconds |

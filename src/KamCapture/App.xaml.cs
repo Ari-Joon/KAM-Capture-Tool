@@ -97,6 +97,34 @@ namespace KamCapture
                 return;
             }
 
+            if (e.Args.Any(a => a.Equals("--audiodiag", StringComparison.OrdinalIgnoreCase)))
+            {
+                Environment.ExitCode = SelfTest.AudioDiag();
+                Shutdown();
+                return;
+            }
+
+            var mixTest = e.Args.FirstOrDefault(a => a.StartsWith("--mixtest", StringComparison.OrdinalIgnoreCase));
+            if (mixTest != null)
+            {
+                var dir = mixTest.Contains('=')
+                    ? mixTest[(mixTest.IndexOf('=') + 1)..]
+                    : System.IO.Path.Combine(System.IO.Path.GetTempPath(), "KAM Capture Tool", "mix-test");
+                Environment.ExitCode = SelfTest.MixTest(dir);
+                Shutdown();
+                return;
+            }
+
+            var playTone = e.Args.FirstOrDefault(a => a.StartsWith("--playtone=", StringComparison.OrdinalIgnoreCase));
+            if (playTone != null)
+            {
+                var spec = playTone["--playtone=".Length..].Split(',', 2);
+                Environment.ExitCode = SelfTest.PlayTone(int.TryParse(spec[0], out var t) ? t : 10,
+                                                         spec.Length > 1 ? spec[1] : null);
+                Shutdown();
+                return;
+            }
+
             if (e.Args.Any(a => a.Equals("--installtest", StringComparison.OrdinalIgnoreCase)))
             {
                 Environment.ExitCode = SelfTest.InstallTest();
@@ -159,6 +187,31 @@ namespace KamCapture
                 return;
             }
 
+            // An option this version does not know means a command meant for a
+            // different build. Starting up normally in answer to one once put an
+            // install prompt on the screen, and a development build was installed
+            // over the real program. Say so in the log, and stop.
+            var unknown = e.Args.Where(a => a.StartsWith("--") && !KnownOptions.Contains(OptionName(a))).ToList();
+            if (unknown.Count > 0)
+            {
+                Log.Warn("Not starting: unknown option " + string.Join(" ", unknown));
+                Console.Error.WriteLine("Unknown option: " + string.Join(" ", unknown));
+                Environment.ExitCode = 2;
+                Shutdown();
+                return;
+            }
+
+            // A development build must never install itself; see Installer.IsCompleteProgram.
+            if (!Installer.IsCompleteProgram &&
+                e.Args.Any(a => a.Equals("--install-silent", StringComparison.OrdinalIgnoreCase) ||
+                                a.Equals("--apply-update", StringComparison.OrdinalIgnoreCase)))
+            {
+                Log.Warn("A development build was asked to install itself; refused.");
+                Environment.ExitCode = 3;
+                Shutdown();
+                return;
+            }
+
             // Setup commands must act even when a copy is running, so ask it to
             // close rather than handing the command to it — handed over, an
             // uninstall would simply open the running copy's window.
@@ -179,7 +232,8 @@ namespace KamCapture
             // always a newer download. Handing it over would only bring the
             // running copy's window up, so offer to install over it instead;
             // the running copy is closed only if the user goes ahead.
-            if (ShouldOfferUpdate(SingleInstance.IsAnotherCopyRunning(), Installer.InstalledDir,
+            if (Installer.IsCompleteProgram &&
+                ShouldOfferUpdate(SingleInstance.IsAnotherCopyRunning(), Installer.InstalledDir,
                                   Installer.CurrentDir, e.Args))
             {
                 Log.Info($"Offering {Installer.Version} over the running copy ({Installer.InstalledVersion})");
@@ -223,6 +277,21 @@ namespace KamCapture
                 _ = RecordingController.StartAudioAsync(_cfg);
 
             StartUpdates(e.Args);
+        }
+
+        /// <summary>Every option this version answers to, besides the diagnostics handled above.</summary>
+        private static readonly System.Collections.Generic.HashSet<string> KnownOptions =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                "--tray", "--no-tray", "--portable", "--capture", "--record", "--record-audio",
+                "--update", "--updated-from", "--apply-update", "--install-silent",
+                "--uninstall", "--quiet", "--exit"
+            };
+
+        private static string OptionName(string arg)
+        {
+            int eq = arg.IndexOf('=');
+            return eq < 0 ? arg : arg[..eq];
         }
 
         private static bool IsSetupCommand(string[] args) =>
@@ -412,6 +481,9 @@ namespace KamCapture
         {
             bool portable = args.Any(a => a.Equals("--portable", StringComparison.OrdinalIgnoreCase));
             if (portable || _cfg.SkipSetupPrompt || Installer.IsRunningInstalled) return true;
+
+            // A development build runs where it is and never offers to install.
+            if (!Installer.IsCompleteProgram) return true;
 
             var setup = new SetupWindow();
             bool? result = setup.ShowDialog();
@@ -604,7 +676,9 @@ namespace KamCapture
 
             Bind(_cfg.HotkeyRegion, () => Start(SnipMode.Region));
             Bind(_cfg.HotkeyWindow, () => Start(SnipMode.Window));
-            Bind(_cfg.HotkeyFullScreen, () => Start(SnipMode.FullScreen));
+            // Full screen means the display the pointer is on, as it does on the
+            // home window and in the tray. It used to take every display at once.
+            Bind(_cfg.HotkeyFullScreen, () => Start(SnipMode.Monitor));
             Bind(_cfg.HotkeyRecord, () =>
             {
                 if (RecordingController.IsRecording) RecordingController.StopActive();

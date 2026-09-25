@@ -100,6 +100,14 @@ namespace KamCapture.Setup
 
         private async void OnInstall(object sender, RoutedEventArgs e)
         {
+            if (!Installer.IsCompleteProgram)
+            {
+                MessageBox.Show(this, "This is a development build. It can run from where it is, but it cannot be installed: " +
+                    "on its own it is only a launcher. Install the KamCapture.exe from the Releases page instead.",
+                    Installer.ProductName, MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             BtnInstall.IsEnabled = false;
             BtnPortable.IsEnabled = false;
             BtnClose.IsEnabled = false;

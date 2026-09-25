@@ -7,6 +7,7 @@ using System.Threading;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using Log = KamCapture.Services.Log;
 
 namespace KamCapture.Recording
 {
@@ -27,7 +28,7 @@ namespace KamCapture.Recording
             {
                 using var en = new MMDeviceEnumerator();
                 string defaultId = "";
-                try { defaultId = en.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications).ID; } catch { }
+                try { defaultId = en.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Console).ID; } catch { }
 
                 foreach (var d in en.EnumerateAudioEndPoints(DataFlow.Capture, DeviceState.Active))
                     list.Add(new AudioDevice { Id = d.ID, Name = d.FriendlyName, IsDefault = d.ID == defaultId });
@@ -52,6 +53,31 @@ namespace KamCapture.Recording
             return list;
         }
 
+        /// <summary>
+        /// The name of the device "Default" means right now: Windows' default
+        /// microphone, or its default output. Shown beside the word, because the
+        /// default is not always the device you would guess — a headset jack
+        /// can quietly be the default microphone while you talk into a USB one.
+        /// </summary>
+        public static string DefaultName(DataFlow flow)
+        {
+            try
+            {
+                using var en = new MMDeviceEnumerator();
+                return en.GetDefaultAudioEndpoint(flow, flow == DataFlow.Capture ? Role.Console : Role.Multimedia).FriendlyName;
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>"Default: External Microphone (Realtek(R) Audio)", or just "Default microphone".</summary>
+        public static string DefaultMicrophoneLabel()
+        {
+            var name = DefaultName(DataFlow.Capture);
+            return name.Length > 0 ? "Default: " + name : "Default microphone";
+        }
+
+        public const string EveryOutputLabel = "Every output";
+
         public static MMDevice? ById(string id, DataFlow flow)
         {
             if (string.IsNullOrEmpty(id)) return null;
@@ -72,19 +98,31 @@ namespace KamCapture.Recording
     /// and emits silence when nothing is playing. That is what makes it safe to
     /// add or drop a microphone in the middle of a recording — the file keeps
     /// receiving an unbroken track, so audio and video never drift apart.
+    ///
+    /// System audio is taken from every output at once unless one is chosen.
+    /// It used to be the default output only, and a laptop has several — the
+    /// speakers, the headphone jack, a monitor's HDMI audio — so a call playing
+    /// through one while Windows' default was another recorded as pure silence,
+    /// and plugging headphones in part way through moved the sound out from
+    /// under the recording. A watcher also picks up outputs that appear during a
+    /// recording, and reopens any that stop.
     /// </summary>
     public sealed class AudioEngine : IDisposable
     {
         public const int SampleRate = 48000;
         public const int Channels = 2;
 
+        private static readonly WaveFormat MixFormat = WaveFormat.CreateIeeeFloatWaveFormat(SampleRate, Channels);
+
         private readonly MixingSampleProvider _mixer;
         private readonly object _lock = new();
         private readonly Dictionary<string, Source> _sources = new();
+        private readonly Timer _watch;
         private Stream? _output;
         private Thread? _writer;
         private volatile bool _running;
         private volatile bool _paused;
+        private volatile bool _disposed;
 
         /// <summary>Sample frames written so far: the length of the track, exactly.</summary>
         public long FramesWritten { get; private set; }
@@ -96,26 +134,46 @@ namespace KamCapture.Recording
         /// <summary>Peak level of the last block, 0..1, for the meter on the bar.</summary>
         public float LastPeak { get; private set; }
 
-        private sealed class Source : IDisposable
+        /// <summary>One device feeding a source: its capture, its buffer, and 48 kHz stereo out.</summary>
+        private sealed class Tap
         {
-            public IWaveIn? Capture;
-            public BufferedWaveProvider? Buffer;
-            public ISampleProvider? Provider;
-            public VolumeSampleProvider? Volume;
+            public string DeviceId = "";
+            public string Name = "";
+            public IWaveIn Capture = null!;
+            public BufferedWaveProvider Buffer = null!;
+            public ISampleProvider Output = null!;
+            public volatile bool Dead;
+            public volatile bool Closing;
 
-            public void Dispose()
+            public void Close()
             {
-                try { Capture?.StopRecording(); } catch { }
-                try { Capture?.Dispose(); } catch { }
-                Capture = null;
+                Closing = true;
+                try { Capture.StopRecording(); } catch { }
+                try { Capture.Dispose(); } catch { }
             }
+        }
+
+        /// <summary>
+        /// A named input to the mix — "system" or "mic" — made of one tap, or
+        /// for system audio from every output, one tap per output.
+        /// </summary>
+        private sealed class Source
+        {
+            public string Key = "";
+            public DataFlow Flow;
+            public string DeviceId = "";          // empty: every output, or the default microphone
+            public readonly List<Tap> Taps = new();
+            public readonly MixingSampleProvider Mix = new(MixFormat) { ReadFully = true };
+            public VolumeSampleProvider Volume = null!;
+            public Meter Level = null!;
+
+            public bool EveryOutput => Flow == DataFlow.Render && DeviceId.Length == 0;
         }
 
         public AudioEngine()
         {
-            _mixer = new MixingSampleProvider(
-                WaveFormat.CreateIeeeFloatWaveFormat(SampleRate, Channels))
-            { ReadFully = true };
+            _mixer = new MixingSampleProvider(MixFormat) { ReadFully = true };
+            _watch = new Timer(_ => Watch(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
         }
 
         public bool Has(string key)
@@ -127,96 +185,209 @@ namespace KamCapture.Recording
         {
             lock (_lock)
             {
-                if (_sources.TryGetValue(key, out var s) && s.Volume != null)
+                if (_sources.TryGetValue(key, out var s))
                     s.Volume.Volume = (float)Math.Clamp(gain, 0, 4);
             }
         }
 
-        /// <summary>System audio, captured as a loopback of an output device.</summary>
-        public bool AddSystemAudio(string key, string? deviceId, double gain)
+        /// <summary>The level one source reached in the last block, 0..1: is it hearing anything.</summary>
+        public float PeakOf(string key)
         {
-            try
-            {
-                var device = AudioDevices.ById(deviceId ?? "", DataFlow.Render);
-                var capture = device != null
-                    ? new WasapiLoopbackCapture(device)
-                    : new WasapiLoopbackCapture();
-                return Add(key, capture, gain);
-            }
-            catch (Exception ex)
-            {
-                Failed?.Invoke("System audio could not be opened: " + ex.Message);
-                return false;
-            }
+            lock (_lock) return _sources.TryGetValue(key, out var s) ? s.Level.Peak : 0;
         }
 
-        public bool AddMicrophone(string key, string? deviceId, double gain)
-        {
-            try
-            {
-                var device = AudioDevices.ById(deviceId ?? "", DataFlow.Capture);
-                IWaveIn capture = device != null
-                    ? new WasapiCapture(device)
-                    : new WasapiCapture();
-                return Add(key, capture, gain);
-            }
-            catch (Exception ex)
-            {
-                Failed?.Invoke("Microphone could not be opened: " + ex.Message);
-                return false;
-            }
-        }
+        /// <summary>
+        /// System audio. With no device given, every output at once — whichever
+        /// one a call or a video plays through, it is heard.
+        /// </summary>
+        public bool AddSystemAudio(string key, string? deviceId, double gain) =>
+            AddSource(key, DataFlow.Render, deviceId ?? "", gain);
 
-        private bool Add(string key, IWaveIn capture, double gain)
+        public bool AddMicrophone(string key, string? deviceId, double gain) =>
+            AddSource(key, DataFlow.Capture, deviceId ?? "", gain);
+
+        private bool AddSource(string key, DataFlow flow, string deviceId, double gain)
         {
             Remove(key);
 
-            var buffer = new BufferedWaveProvider(capture.WaveFormat)
+            var source = new Source { Key = key, Flow = flow, DeviceId = deviceId };
+            source.Volume = new VolumeSampleProvider(source.Mix) { Volume = (float)Math.Clamp(gain, 0, 4) };
+            source.Level = new Meter(source.Volume);
+
+            var opened = new List<Tap>();
+            foreach (var device in DevicesFor(source))
             {
-                BufferDuration = TimeSpan.FromSeconds(3),
-                DiscardOnBufferOverflow = true
-            };
-
-            capture.DataAvailable += (_, e) =>
-            {
-                try { buffer.AddSamples(e.Buffer, 0, e.BytesRecorded); } catch { }
-            };
-            capture.RecordingStopped += (_, e) =>
-            {
-                if (e.Exception != null) Failed?.Invoke(e.Exception.Message);
-            };
-
-            ISampleProvider provider = buffer.ToSampleProvider();
-
-            if (provider.WaveFormat.Channels == 1)
-                provider = new MonoToStereoSampleProvider(provider);
-            else if (provider.WaveFormat.Channels > 2)
-                provider = new StereoToMonoSampleProvider(provider) { LeftVolume = 0.5f, RightVolume = 0.5f };
-
-            if (provider.WaveFormat.Channels == 1)
-                provider = new MonoToStereoSampleProvider(provider);
-
-            if (provider.WaveFormat.SampleRate != SampleRate)
-                provider = new WdlResamplingSampleProvider(provider, SampleRate);
-
-            var volume = new VolumeSampleProvider(provider) { Volume = (float)Math.Clamp(gain, 0, 4) };
-
-            var source = new Source
-            {
-                Capture = capture,
-                Buffer = buffer,
-                Provider = volume,
-                Volume = volume
-            };
+                var tap = Open(device, flow);
+                if (tap != null) opened.Add(tap);
+            }
 
             lock (_lock)
             {
-                _mixer.AddMixerInput(source.Provider);
+                foreach (var tap in opened)
+                {
+                    source.Taps.Add(tap);
+                    source.Mix.AddMixerInput(tap.Output);
+                }
                 _sources[key] = source;
+                _mixer.AddMixerInput(source.Level);
             }
 
-            capture.StartRecording();
+            var what = flow == DataFlow.Render ? "System audio" : "Microphone";
+            if (opened.Count == 0)
+            {
+                Report($"{what} could not be opened on any device.");
+                return false;
+            }
+            Log.Info($"{what} from: " + string.Join(", ", opened.Select(t => t.Name)));
             return true;
+        }
+
+        /// <summary>The devices a source should be listening to right now.</summary>
+        private static List<MMDevice> DevicesFor(Source source)
+        {
+            var list = new List<MMDevice>();
+            try
+            {
+                using var en = new MMDeviceEnumerator();
+                if (source.EveryOutput)
+                {
+                    list.AddRange(en.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active));
+                }
+                else if (source.DeviceId.Length > 0)
+                {
+                    var d = en.EnumerateAudioEndPoints(source.Flow, DeviceState.Active)
+                              .FirstOrDefault(x => x.ID == source.DeviceId);
+                    if (d != null) list.Add(d);
+                }
+                else
+                {
+                    // The default microphone: what Windows calls the default device.
+                    list.Add(en.GetDefaultAudioEndpoint(source.Flow, Role.Console));
+                }
+            }
+            catch { }
+            return list;
+        }
+
+        private Tap? Open(MMDevice device, DataFlow flow)
+        {
+            string name = "";
+            try
+            {
+                name = device.FriendlyName;
+                IWaveIn capture = flow == DataFlow.Render
+                    ? new WasapiLoopbackCapture(device)
+                    : new WasapiCapture(device);
+
+                var tap = new Tap
+                {
+                    DeviceId = device.ID,
+                    Name = name,
+                    Capture = capture,
+                    Buffer = new BufferedWaveProvider(capture.WaveFormat)
+                    {
+                        BufferDuration = TimeSpan.FromSeconds(3),
+                        DiscardOnBufferOverflow = true
+                    }
+                };
+
+                capture.DataAvailable += (_, e) =>
+                {
+                    try { tap.Buffer.AddSamples(e.Buffer, 0, e.BytesRecorded); } catch { }
+                };
+                capture.RecordingStopped += (_, e) =>
+                {
+                    if (tap.Closing) return;
+                    // Unplugged, disabled, or its format changed. The watcher
+                    // takes it out, and opens it again if it comes back.
+                    tap.Dead = true;
+                    Log.Warn($"Audio from {tap.Name} stopped: {e.Exception?.Message ?? "no reason given"}");
+                };
+
+                tap.Output = new Endless(ToMixFormat(tap.Buffer.ToSampleProvider()));
+                capture.StartRecording();
+                return tap;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"Could not open {(flow == DataFlow.Render ? "output" : "microphone")} {name}: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>Any device's format, as the mix wants it: 48 kHz, stereo, float.</summary>
+        private static ISampleProvider ToMixFormat(ISampleProvider provider)
+        {
+            int channels = provider.WaveFormat.Channels;
+            if (channels == 1)
+                provider = new MonoToStereoSampleProvider(provider);
+            else if (channels > 2)
+                provider = new Downmix(provider);
+
+            if (provider.WaveFormat.SampleRate != SampleRate)
+                provider = new WdlResamplingSampleProvider(provider, SampleRate);
+            return provider;
+        }
+
+        /// <summary>
+        /// Every two seconds: take out taps whose device stopped, and open any
+        /// that should be there and are not — an output that appeared, a
+        /// microphone plugged back in.
+        /// </summary>
+        private void Watch()
+        {
+            if (_disposed) return;
+            List<Source> sources;
+            lock (_lock) sources = _sources.Values.ToList();
+
+            foreach (var source in sources)
+            {
+                List<Tap> dead;
+                HashSet<string> live;
+                lock (_lock)
+                {
+                    dead = source.Taps.Where(t => t.Dead).ToList();
+                    foreach (var t in dead)
+                    {
+                        source.Taps.Remove(t);
+                        source.Mix.RemoveMixerInput(t.Output);
+                    }
+                    live = source.Taps.Select(t => t.DeviceId).ToHashSet();
+                }
+                foreach (var t in dead) t.Close();
+
+                // The default microphone is one device, whichever it is; the
+                // others are exactly the devices listed.
+                bool wantsOne = !source.EveryOutput;
+                if (wantsOne && live.Count > 0) continue;
+
+                foreach (var device in DevicesFor(source))
+                {
+                    if (live.Contains(device.ID)) continue;
+                    var tap = Open(device, source.Flow);
+                    if (tap == null) continue;
+
+                    bool kept = false;
+                    lock (_lock)
+                    {
+                        if (!_disposed && _sources.TryGetValue(source.Key, out var current) && ReferenceEquals(current, source))
+                        {
+                            source.Taps.Add(tap);
+                            source.Mix.AddMixerInput(tap.Output);
+                            kept = true;
+                        }
+                    }
+                    if (kept) Log.Info($"Now also recording from {tap.Name}");
+                    else tap.Close();
+                    if (wantsOne) break;
+                }
+            }
+        }
+
+        private void Report(string message)
+        {
+            Log.Warn(message);
+            Failed?.Invoke(message);
         }
 
         /// <summary>
@@ -239,9 +410,10 @@ namespace KamCapture.Recording
             lock (_lock)
             {
                 foreach (var s in _sources.Values)
-                {
-                    try { s.Buffer?.ClearBuffer(); } catch { }
-                }
+                    foreach (var t in s.Taps)
+                    {
+                        try { t.Buffer.ClearBuffer(); } catch { }
+                    }
             }
             _paused = false;
         }
@@ -253,12 +425,9 @@ namespace KamCapture.Recording
             {
                 if (!_sources.TryGetValue(key, out source)) return;
                 _sources.Remove(key);
-                if (source.Provider != null)
-                {
-                    try { _mixer.RemoveMixerInput(source.Provider); } catch { }
-                }
+                try { _mixer.RemoveMixerInput(source.Level); } catch { }
             }
-            source.Dispose();
+            foreach (var t in source.Taps) t.Close();
         }
 
         /// <summary>Begin writing the mix. The stream is written until Stop.</summary>
@@ -347,10 +516,24 @@ namespace KamCapture.Recording
 
         public void Stop()
         {
+            _disposed = true;
+            try { _watch.Dispose(); } catch { }
             _running = false;
             try { _writer?.Join(500); } catch { }
 
-            foreach (var key in _sources.Keys.ToList()) Remove(key);
+            List<string> keys;
+            lock (_lock)
+            {
+                keys = _sources.Keys.ToList();
+                // One line per take: what each source actually heard. A source
+                // that heard nothing for a whole take is the first thing to know
+                // when a recording comes back silent.
+                if (FramesWritten > 0 && _sources.Count > 0)
+                    Log.Info("Take ended after " + (FramesWritten / (double)SampleRate).ToString("0.0") + " s; loudest: " +
+                             string.Join(", ", _sources.Values.Select(s =>
+                                 $"{s.Key} {s.Level.Loudest:0.000} from {(s.Taps.Count == 0 ? "no device" : string.Join(" + ", s.Taps.Select(t => t.Name)))}")));
+            }
+            foreach (var key in keys) Remove(key);
 
             try { _output?.Flush(); } catch { }
             try { _output?.Dispose(); } catch { }
@@ -358,5 +541,105 @@ namespace KamCapture.Recording
         }
 
         public void Dispose() => Stop();
+
+        /// <summary>
+        /// Always hands back as much as was asked for. The mixer drops any input
+        /// that returns short, taking it as finished — and a resampler can return
+        /// short on an ordinary read, which silently lost that device for the
+        /// rest of the recording.
+        /// </summary>
+        private sealed class Endless : ISampleProvider
+        {
+            private readonly ISampleProvider _inner;
+            public Endless(ISampleProvider inner) => _inner = inner;
+            public WaveFormat WaveFormat => _inner.WaveFormat;
+
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int total = 0;
+                while (total < count)
+                {
+                    int read = _inner.Read(buffer, offset + total, count - total);
+                    if (read <= 0) break;
+                    total += read;
+                }
+                if (total < count) Array.Clear(buffer, offset + total, count - total);
+                return count;
+            }
+        }
+
+        /// <summary>Passes samples through and remembers the loudest in each block.</summary>
+        private sealed class Meter : ISampleProvider
+        {
+            private readonly ISampleProvider _inner;
+            public volatile float Peak;
+            public volatile float Loudest;
+            public Meter(ISampleProvider inner) => _inner = inner;
+            public WaveFormat WaveFormat => _inner.WaveFormat;
+
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int read = _inner.Read(buffer, offset, count);
+                float peak = 0;
+                for (int i = offset; i < offset + read; i++)
+                {
+                    float a = Math.Abs(buffer[i]);
+                    if (a > peak) peak = a;
+                }
+                Peak = Math.Min(1f, peak);
+                if (Peak > Loudest) Loudest = Peak;
+                return read;
+            }
+        }
+
+        /// <summary>
+        /// Surround to stereo. 5.1 and 7.1 fold the centre and the surrounds in;
+        /// anything else keeps its front pair. A monitor's HDMI output is often
+        /// eight channels, which the old stereo-only conversion refused outright.
+        /// </summary>
+        private sealed class Downmix : ISampleProvider
+        {
+            private readonly ISampleProvider _source;
+            private readonly int _channels;
+            private float[] _buffer = Array.Empty<float>();
+
+            public Downmix(ISampleProvider source)
+            {
+                _source = source;
+                _channels = source.WaveFormat.Channels;
+                WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(source.WaveFormat.SampleRate, 2);
+            }
+
+            public WaveFormat WaveFormat { get; }
+
+            public int Read(float[] buffer, int offset, int count)
+            {
+                int frames = count / 2;
+                int need = frames * _channels;
+                if (_buffer.Length < need) _buffer = new float[need];
+
+                int got = _source.Read(_buffer, 0, need) / _channels;
+                bool surround = _channels is 6 or 8;
+                for (int f = 0; f < got; f++)
+                {
+                    int b = f * _channels;
+                    float left = _buffer[b], right = _buffer[b + 1];
+                    if (surround)
+                    {
+                        float centre = _buffer[b + 2] * 0.707f;
+                        left += centre + _buffer[b + 4] * 0.5f;
+                        right += centre + _buffer[b + 5] * 0.5f;
+                        if (_channels == 8)
+                        {
+                            left += _buffer[b + 6] * 0.5f;
+                            right += _buffer[b + 7] * 0.5f;
+                        }
+                    }
+                    buffer[offset + f * 2] = left;
+                    buffer[offset + f * 2 + 1] = right;
+                }
+                return got * 2;
+            }
+        }
     }
 }

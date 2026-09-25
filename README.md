@@ -195,9 +195,44 @@ or download an hour of 4K video of something that changed forty times.
 **Audio** records system audio, the microphone, or both, into one file. It is the
 same in-process mixer the video uses, so it has the same property: either source
 can be switched on or off from the recording bar in the middle of a take, and the
-track carries on without a gap. System audio can come from a particular output
-rather than the default one, which matters when the call is playing through a
-headset and everything else through the speakers.
+track carries on without a gap.
+
+### System audio from every output
+
+The first real lecture recorded with it came back wrong. Of fifteen takes, eight
+held stretches of *digital* silence — every sample exactly zero, which no
+microphone ever produces — starting the moment the microphone was muted. System
+audio had contributed nothing.
+
+System audio was recorded from one output: whichever Windows called the default
+when the take began. A laptop has several — its speakers, its headphone jack, a
+monitor's HDMI audio when one is plugged in — and a call or a video can play
+through any of them. Plug headphones in part way through and the sound moves out
+from under the recording. So it now records **every output at once**, checks
+every two seconds for outputs that have appeared, and reopens any that stop.
+Choosing one output is still there for anyone who wants only that one.
+
+`--mixtest` plays a quiet tone from a separate program, the way a call would,
+through each output in turn, and records it through the real recorder while each
+microphone is switched on, off and on. Every output is heard at full level, and
+the microphone changes nothing:
+
+| Tone on | Microphone on | Off | On again |
+|---|---|---|---|
+| Speakers | 0.0201 | 0.0197 | 0.0199 |
+| Headphones — the default | 0.0204 | 0.0200 | 0.0200 |
+| Listening to the default alone, as before 1.7.0: Speakers | | 0.0014 | |
+
+The last row is the old behaviour, for comparison: the same tone at 7% of its
+level. How much leaks through depends on the hardware — this Realtek feeds its
+speakers into its headphones' loopback a little; a monitor's HDMI output is a
+separate device and feeds nothing.
+
+The cause of those particular silent takes cannot be proven after the fact,
+because nothing about audio was logged. Now it is: every take ends with a line
+saying what each source heard and from which devices, and the recording bar has
+a meter for system audio and another for the microphone, so a source that is
+hearing nothing shows it before an hour has been recorded.
 
 Each kind of output has a folder of its own, in the Windows library it belongs
 to — `Pictures\KAM Capture Tool\Screenshots`, `Videos\KAM Capture Tool\Recordings`
@@ -460,7 +495,7 @@ and nothing about you or your captures, and it can be switched off in Settings.
 |---|---|
 | `Ctrl+Shift+S` | Capture a region |
 | `Ctrl+Shift+W` | Capture a window |
-| `Ctrl+Shift+F` | Capture everything |
+| `Ctrl+Shift+F` | Screenshot the full screen — the display the pointer is on |
 | `Ctrl+Shift+R` | Record video, or save whatever is recording |
 
 Inside the annotator: `V` select · `P` pencil · `K` highlighter · `L` line ·
@@ -473,7 +508,7 @@ Full reference in [docs/SETUP.md](docs/SETUP.md).
 
 ## Status
 
-Version 1.6.1. Everything described above is implemented and works.
+Version 1.7.0. Everything described above is implemented and works.
 
 | Area | State |
 |---|---|
@@ -490,6 +525,7 @@ Version 1.6.1. Everything described above is implemented and works.
 | A folder and an Open button for each kind of output | Done |
 | Save as for screenshots, videos and audio, with the next name filled in | Done |
 | Retake, and a Stop that saves nothing, into the Recycle Bin rather than away for good | Done |
+| System audio from every output, followed as devices come and go, with a meter per source | Done |
 | Layout check: nothing cut off, in any window, in CI | Done |
 | Self-install, shortcuts, uninstall entry | Done |
 | Updates from GitHub, with a prompt | Done |
@@ -504,14 +540,12 @@ The honest gaps:
   capture modes turned out to be the right number; a fourth was clutter.
 - **The interactive editor has no automated tests.** Rendering, grouping and
   export are covered by `--selftest`, which runs in CI; mouse interaction is not.
-- **Audio-only has not been through a real lecture yet.** Video recording has:
-  the microphone switched off mid-take, system audio came through, and the
-  file was right. Audio-only shares that mixer and is measured by
-  `--audiotest`, which switches system audio off and on and pauses in the middle
-  of a take, but an hour-long call is a different test from eight seconds.
-- **The annotator's Retake has no automated test.** It opens the selection
-  overlay across the screen, which the headless checks deliberately avoid. The
-  recording side is covered end to end by `--retaketest`.
+- **The first lecture's silent takes are explained, not proven.** Every output is
+  now recorded and every take logs what it heard, which covers each cause that
+  could be found; the next lecture is the test of whether that was all of them.
+- **Exclusive mode cannot be recorded.** A program that takes an output for
+  itself, past the Windows mixer — some editors and players can — is inaudible
+  to any recorder, this one included.
 - **The layout check does not cover the capture overlay or the recording bar.**
   The overlay is drawn in code rather than laid out, and the bar sizes itself to
   whatever it holds, so neither has an edge to be cut off by in the same sense.

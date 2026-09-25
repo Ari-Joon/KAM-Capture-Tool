@@ -315,6 +315,220 @@ namespace KamCapture.Services
             return found.Count;
         }
 
+        /// <summary>
+        /// System audio must be recorded whichever output it plays through, and
+        /// switching the microphone must not touch it. Another process plays a
+        /// quiet 440 Hz tone, as a call or a video would — through each output in
+        /// turn, then through the default output while each microphone is tried.
+        /// Each take goes through the real recorder to a file, which is decoded
+        /// and the tone measured with the microphone on, off and on again.
+        /// Audible: a faint tone while it runs.
+        /// </summary>
+        public static int MixTest(string folder)
+        {
+            var cfg = Settings.AppSettings.Load();
+            var keep = (cfg.AudioFolder, cfg.AudioFormat, cfg.FileNameTemplate, cfg.SystemAudioDeviceId);
+            var failures = new System.Collections.Generic.List<string>();
+            try
+            {
+                var ffmpeg = Recording.FfmpegLocator.Resolve(null);
+                if (ffmpeg == null) return Fail("ffmpeg not found");
+                folder = Path.GetFullPath(folder);
+                Directory.CreateDirectory(folder);
+                cfg.AudioFolder = folder;
+                cfg.AudioFormat = "wav";
+                cfg.SystemAudioDeviceId = "";          // every output, the default
+
+                var scenarios = new System.Collections.Generic.List<(string What, string OutputId, string MicId)>();
+                foreach (var o in Recording.AudioDevices.Outputs())
+                    scenarios.Add(($"tone on {o.Name}{(o.IsDefault ? " (the default)" : "")}, default microphone", o.Id, ""));
+                foreach (var m in Recording.AudioDevices.Inputs())
+                    scenarios.Add(($"tone on the default output, {m.Name}", "", m.Id));
+
+                int n = 0;
+                foreach (var (what, outputId, micId) in scenarios)
+                {
+                    Say(what);
+                    cfg.FileNameTemplate = $"kam-mix-test-{n++}";
+                    using var tone = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                        Environment.ProcessPath!, $"--playtone=9{(outputId.Length > 0 ? "," + outputId : "")}")
+                        { UseShellExecute = false, CreateNoWindow = true })!;
+                    Pump(1200);
+
+                    var levels = RecordWhileSwitching(cfg, ffmpeg, micId);
+                    try { if (!tone.HasExited) tone.Kill(); } catch { }
+
+                    for (int i = 0; i < levels.Length; i++)
+                    {
+                        bool micOn = i % 2 == 0;
+                        Say($"  microphone {(micOn ? "on " : "off")}: system audio {levels[i]:0.0000}");
+                    }
+                    if (levels[1] < 0.01)
+                        failures.Add($"{what}: no system audio with the microphone off ({levels[1]:0.0000})");
+                    for (int i = 0; i < levels.Length; i++)
+                    {
+                        double db = 20 * Math.Log10(Math.Max(1e-6, levels[i]) / Math.Max(1e-6, levels[1]));
+                        if (levels[1] >= 0.01 && Math.Abs(db) > 3)
+                            failures.Add($"{what}: system audio changed {db:+0.0;-0.0} dB when the microphone switched");
+                    }
+                }
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+            finally
+            {
+                (cfg.AudioFolder, cfg.AudioFormat, cfg.FileNameTemplate, cfg.SystemAudioDeviceId) = keep;
+            }
+
+            // For comparison: what listening to the default output alone, as
+            // every version before 1.7.0 did, hears of a tone on another output.
+            // It depends on the hardware — this Realtek feeds its speakers into
+            // its headphones' loopback at half level; separate devices, like a
+            // monitor's HDMI audio, give nothing — so it is reported, not judged.
+            try
+            {
+                var outputs = Recording.AudioDevices.Outputs();
+                var standard = outputs.FirstOrDefault(o => o.IsDefault);
+                var other = outputs.FirstOrDefault(o => !o.IsDefault);
+                if (standard != null && other != null && Recording.FfmpegLocator.Resolve(null) is { } ff)
+                {
+                    Say($"for comparison, the old way: default output only, tone on {other.Name}");
+                    cfg.AudioFolder = Path.GetFullPath(folder);
+                    cfg.AudioFormat = "wav";
+                    cfg.FileNameTemplate = "kam-mix-test-control";
+                    cfg.SystemAudioDeviceId = standard.Id;
+                    using var tone = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                        Environment.ProcessPath!, $"--playtone=9,{other.Id}") { UseShellExecute = false, CreateNoWindow = true })!;
+                    Pump(1200);
+                    var levels = RecordWhileSwitching(cfg, ff, "");
+                    try { if (!tone.HasExited) tone.Kill(); } catch { }
+                    Say($"  microphone off: system audio {levels[1]:0.0000} — every output heard it at full level above");
+                }
+            }
+            catch (Exception ex) { Say("  comparison not run: " + ex.Message); }
+            finally
+            {
+                (cfg.AudioFolder, cfg.AudioFormat, cfg.FileNameTemplate, cfg.SystemAudioDeviceId) = keep;
+            }
+
+            if (failures.Count > 0) return Fail(string.Join("; ", failures));
+            Say("mix-test OK");
+            return 0;
+        }
+
+        /// <summary>For --mixtest: a quiet 440 Hz tone, on one output or the default, from its own process.</summary>
+        public static int PlayTone(int seconds, string? outputId)
+        {
+            var device = string.IsNullOrEmpty(outputId) ? null
+                : Recording.AudioDevices.ById(outputId, NAudio.CoreAudioApi.DataFlow.Render);
+            using var output = device != null
+                ? new NAudio.Wave.WasapiOut(device, NAudio.CoreAudioApi.AudioClientShareMode.Shared, true, 50)
+                : new NAudio.Wave.WasapiOut(NAudio.CoreAudioApi.AudioClientShareMode.Shared, 50);
+            output.Init(NAudio.Wave.WaveExtensionMethods.ToWaveProvider(new NAudio.Wave.SampleProviders.SignalGenerator(48000, 2)
+            {
+                Frequency = 440, Gain = 0.02, Type = NAudio.Wave.SampleProviders.SignalGeneratorType.Sin
+            }));
+            output.Play();
+            Thread.Sleep(TimeSpan.FromSeconds(seconds));
+            output.Stop();
+            return 0;
+        }
+
+        /// <summary>
+        /// Two seconds each with the microphone on, off, on, through the real
+        /// recorder to a WAV; the tone level in each stretch, read back from the file.
+        /// </summary>
+        private static double[] RecordWhileSwitching(Settings.AppSettings cfg, string ffmpeg, string micId)
+        {
+            string path;
+            var marks = new long[4];
+            using (var recorder = new Recording.ScreenRecorder(cfg, Recording.RecordTarget.AudioOnly(), ffmpeg))
+            {
+                recorder.Start(systemAudio: true, micDeviceId: micId, systemDeviceId: cfg.SystemAudioDeviceId);
+                bool micOn = true;
+                for (int stretch = 0; stretch < 3; stretch++)
+                {
+                    if (stretch > 0)
+                    {
+                        if (micOn) recorder.Audio.Remove("mic");
+                        else recorder.Audio.AddMicrophone("mic", micId, 1.0);
+                        micOn = !micOn;
+                    }
+                    marks[stretch] = recorder.Audio.FramesWritten;
+                    Pump(2000);
+                }
+                marks[3] = recorder.Audio.FramesWritten;
+                path = recorder.Stop() ?? throw new InvalidOperationException("no file");
+            }
+
+            var bytes = File.ReadAllBytes(path);
+            File.Delete(path);
+            const int header = 44;
+            var left = new short[(bytes.Length - header) / 4];
+            for (int i = 0; i < left.Length; i++) left[i] = BitConverter.ToInt16(bytes, header + i * 4);
+
+            var result = new double[3];
+            for (int stretch = 0; stretch < 3; stretch++)
+            {
+                long from = marks[stretch] + 19200, to = Math.Min(marks[stretch + 1], left.Length);
+                var windows = new System.Collections.Generic.List<double>();
+                for (long w = from; w + 4800 <= to; w += 4800) windows.Add(ToneLevel(left, (int)w, 4800));
+                windows.Sort();
+                result[stretch] = windows.Count > 0 ? windows[windows.Count / 2] : 0;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Which output each program is playing through, and which outputs are
+        /// the defaults. System audio is recorded from one output; a call on a
+        /// different one is silence. Reads only; changes nothing.
+        /// </summary>
+        public static int AudioDiag()
+        {
+            try
+            {
+                using var en = new NAudio.CoreAudioApi.MMDeviceEnumerator();
+                foreach (var flow in new[] { NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.DataFlow.Capture })
+                    foreach (var role in new[] { NAudio.CoreAudioApi.Role.Multimedia, NAudio.CoreAudioApi.Role.Communications })
+                    {
+                        string name;
+                        try { name = en.GetDefaultAudioEndpoint(flow, role).FriendlyName; }
+                        catch { name = "(none)"; }
+                        Say($"default {(flow == NAudio.CoreAudioApi.DataFlow.Render ? "output" : "input")}, {role,-14}: {name}");
+                    }
+
+                foreach (var d in en.EnumerateAudioEndPoints(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.DeviceState.Active))
+                {
+                    Say($"output: {d.FriendlyName}   level now {d.AudioMeterInformation.MasterPeakValue:0.000}");
+                    var sessions = d.AudioSessionManager.Sessions;
+                    for (int i = 0; i < sessions.Count; i++)
+                    {
+                        var s = sessions[i];
+                        string who;
+                        try { who = s.IsSystemSoundsSession ? "Windows sounds" : System.Diagnostics.Process.GetProcessById((int)s.GetProcessID).ProcessName; }
+                        catch { who = "pid " + s.GetProcessID; }
+                        Say($"   {who,-24} {s.State,-22} level {s.AudioMeterInformation.MasterPeakValue:0.000}");
+                    }
+                }
+                return 0;
+            }
+            catch (Exception ex) { return Fail(ex.ToString()); }
+        }
+
+        /// <summary>Amplitude of the 440 Hz tone in a window, by Goertzel: blind to the microphone's noise.</summary>
+        private static double ToneLevel(short[] samples, int start, int count)
+        {
+            double k = 2 * Math.Cos(2 * Math.PI * 440 / 48000.0);
+            double s1 = 0, s2 = 0;
+            for (int i = 0; i < count; i++)
+            {
+                double s0 = samples[start + i] / 32768.0 + k * s1 - s2;
+                s2 = s1;
+                s1 = s0;
+            }
+            return Math.Sqrt(Math.Max(0, s1 * s1 + s2 * s2 - k * s1 * s2)) * 2 / count;
+        }
+
         /// <summary>Wait out a recording, pausing for a stretch in the middle of it.</summary>
         private static void RunWithPause(double seconds, int pauseSeconds, Action pause, Action resume)
         {
@@ -503,6 +717,25 @@ namespace KamCapture.Services
             }
 
             Expect(Snapshot(real) == before, "the real install, shortcuts and sign-in entry are untouched");
+
+            // A development build once installed itself over the real program.
+            // It must know what it is — and an option it does not recognise must
+            // stop it before it gets anywhere near an install prompt.
+            Say("a development build, and an option nobody knows");
+            bool devBuild = File.Exists(Path.Combine(AppContext.BaseDirectory, "KamCapture.dll"));
+            Expect(Setup.Installer.IsCompleteProgram == !devBuild,
+                devBuild ? "this development build knows it cannot install itself"
+                         : "this complete program knows it can install itself");
+            try
+            {
+                using var child = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                    Environment.ProcessPath!, "--kam-no-such-option") { UseShellExecute = false, CreateNoWindow = true })!;
+                bool quit = child.WaitForExit(20000);
+                if (!quit) { try { child.Kill(); } catch { } }
+                Expect(quit && child.ExitCode == 2, "an unknown option quits at once, with no window");
+            }
+            catch (Exception ex) { Expect(false, "unknown option: " + ex.Message); }
+            Expect(Snapshot(real) == before, "and the real install is still untouched");
 
             if (failures > 0) return Fail(failures + " expectation(s) not met");
             Say("install-test OK");
@@ -724,6 +957,26 @@ namespace KamCapture.Services
                 Pump(300);
                 Expect(home.IsVisible, "closing the last annotator brings home back");
 
+                // Retake, through its real button: the capture is taken again the
+                // same way — full screen here, so the overlay commits by itself —
+                // and the new annotator replaces the old, without the home window
+                // flashing up in between.
+                Say("retake a full-screen capture from its annotator");
+                var taken = CaptureOnce(cfg, Settings.SnipMode.Monitor);
+                bool homeSeen = false;
+                home.IsVisibleChanged += (_, _) => { if (home.IsVisible) homeSeen = true; };
+                taken?.BtnRetake.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                UI.EditorWindow? again = null;
+                PumpUntil(() => (again = Application.Current.Windows.OfType<UI.EditorWindow>()
+                    .FirstOrDefault(w => w.IsVisible && !ReferenceEquals(w, taken))) != null, 15000);
+                Pump(300);
+                Expect(taken?.IsVisible != true, "the old annotator is gone");
+                Expect(again != null, "a new annotator opens with the retaken capture");
+                Expect(!homeSeen && !home.IsVisible, "the home window stays aside throughout");
+                again?.Close();
+                Pump(300);
+                Expect(home.IsVisible, "closing it brings home back");
+
                 Say("close the home window, then open it from the tray");
                 home.Close();
                 Pump(200);
@@ -748,7 +1001,7 @@ namespace KamCapture.Services
         /// What CaptureController.RunAsync does around the overlay: clear our
         /// windows, then hand a finished selection to the result handling.
         /// </summary>
-        private static UI.EditorWindow? CaptureOnce(Settings.AppSettings cfg)
+        private static UI.EditorWindow? CaptureOnce(Settings.AppSettings cfg, Settings.SnipMode mode = Settings.SnipMode.Region)
         {
             var before = Application.Current.Windows.OfType<UI.EditorWindow>().ToHashSet();
 
@@ -762,7 +1015,8 @@ namespace KamCapture.Services
             {
                 Action = Capture.CaptureAction.Edit,
                 Image = SampleCapture(),
-                Region = new Int32Rect(0, 0, 520, 300)
+                Region = new Int32Rect(0, 0, 520, 300),
+                Mode = mode
             };
 
             var task = CaptureController.HandleResultAsync(result, cfg, hidden);
